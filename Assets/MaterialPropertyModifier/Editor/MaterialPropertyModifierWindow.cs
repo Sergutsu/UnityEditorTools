@@ -47,6 +47,15 @@ namespace MaterialPropertyModifier.Editor
         private ShaderPropertyType[] availablePropertyTypes;
         private bool showPropertyHelper = false;
         
+        // Material list and preview state
+        private System.Collections.Generic.List<Material> foundMaterials;
+        private ModificationPreview modificationPreview;
+        private Vector2 materialListScrollPosition;
+        private bool showMaterialList = false;
+        private bool showPreview = false;
+        private string materialSearchFilter = "";
+        private bool isSearching = false;
+        
         // UI Layout constants
         private const float WINDOW_MIN_WIDTH = 400f;
         private const float WINDOW_MIN_HEIGHT = 500f;
@@ -170,6 +179,14 @@ namespace MaterialPropertyModifier.Editor
             GUILayout.Space(SECTION_SPACING);
             
             DrawPropertyConfigurationSection();
+            
+            GUILayout.Space(SECTION_SPACING);
+            
+            DrawMaterialListSection();
+            
+            GUILayout.Space(SECTION_SPACING);
+            
+            DrawPreviewSection();
             
             GUILayout.Space(SECTION_SPACING);
             
@@ -489,6 +506,258 @@ namespace MaterialPropertyModifier.Editor
             else
             {
                 EditorGUILayout.HelpBox("No properties found for selected shader", MessageType.Info);
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw the material list section
+        /// </summary>
+        private void DrawMaterialListSection()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Material Discovery", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            
+            // Search button
+            GUI.enabled = isFolderValid && isShaderValid;
+            if (GUILayout.Button("Find Materials", GUILayout.Width(100), GUILayout.Height(BUTTON_HEIGHT)))
+            {
+                FindMaterials();
+            }
+            GUI.enabled = true;
+            
+            EditorGUILayout.EndHorizontal();
+            
+            if (!isFolderValid || !isShaderValid)
+            {
+                EditorGUILayout.HelpBox("Select folder and shader to find materials", MessageType.Info);
+            }
+            else if (isSearching)
+            {
+                EditorGUILayout.HelpBox("Searching for materials...", MessageType.Info);
+            }
+            else if (foundMaterials != null)
+            {
+                DrawMaterialListContent();
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw the material list content
+        /// </summary>
+        private void DrawMaterialListContent()
+        {
+            // Material count and filter
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label($"Found {foundMaterials.Count} materials", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            
+            // Search filter
+            GUILayout.Label("Filter:", GUILayout.Width(40));
+            string newFilter = EditorGUILayout.TextField(materialSearchFilter, GUILayout.Width(150));
+            if (newFilter != materialSearchFilter)
+            {
+                materialSearchFilter = newFilter;
+            }
+            
+            // Toggle list visibility
+            string toggleText = showMaterialList ? "Hide List" : "Show List";
+            if (GUILayout.Button(toggleText, GUILayout.Width(80)))
+            {
+                showMaterialList = !showMaterialList;
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            
+            if (showMaterialList && foundMaterials.Count > 0)
+            {
+                DrawMaterialList();
+            }
+        }
+
+        /// <summary>
+        /// Draw the scrollable material list
+        /// </summary>
+        private void DrawMaterialList()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            // Header
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Material Name", EditorStyles.boldLabel, GUILayout.Width(200));
+            GUILayout.Label("File Path", EditorStyles.boldLabel);
+            EditorGUILayout.EndHorizontal();
+            
+            DrawHorizontalLine();
+            
+            // Scrollable list
+            materialListScrollPosition = EditorGUILayout.BeginScrollView(
+                materialListScrollPosition, 
+                GUILayout.MaxHeight(200)
+            );
+            
+            var filteredMaterials = GetFilteredMaterials();
+            
+            foreach (var material in filteredMaterials)
+            {
+                DrawMaterialListItem(material);
+            }
+            
+            if (filteredMaterials.Count == 0 && !string.IsNullOrEmpty(materialSearchFilter))
+            {
+                EditorGUILayout.HelpBox($"No materials match filter '{materialSearchFilter}'", MessageType.Info);
+            }
+            
+            EditorGUILayout.EndScrollView();
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw a single material list item
+        /// </summary>
+        private void DrawMaterialListItem(Material material)
+        {
+            EditorGUILayout.BeginHorizontal();
+            
+            // Material name (clickable to select in project)
+            if (GUILayout.Button(material.name, EditorStyles.linkLabel, GUILayout.Width(200)))
+            {
+                Selection.activeObject = material;
+                EditorGUIUtility.PingObject(material);
+            }
+            
+            // File path
+            string assetPath = AssetDatabase.GetAssetPath(material);
+            GUILayout.Label(assetPath, EditorStyles.miniLabel);
+            
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// Draw the preview section
+        /// </summary>
+        private void DrawPreviewSection()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Modification Preview", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            
+            // Generate preview button
+            GUI.enabled = CanGeneratePreview();
+            if (GUILayout.Button("Generate Preview", GUILayout.Width(120), GUILayout.Height(BUTTON_HEIGHT)))
+            {
+                GeneratePreview();
+            }
+            GUI.enabled = true;
+            
+            EditorGUILayout.EndHorizontal();
+            
+            if (!CanGeneratePreview())
+            {
+                EditorGUILayout.HelpBox("Configure all settings and find materials to generate preview", MessageType.Info);
+            }
+            else if (modificationPreview != null)
+            {
+                DrawPreviewContent();
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw the preview content
+        /// </summary>
+        private void DrawPreviewContent()
+        {
+            // Preview summary
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Preview Summary:", EditorStyles.boldLabel);
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.BeginVertical("box");
+            
+            GUILayout.Label($"Total Materials: {modificationPreview.TotalMaterials}");
+            GUILayout.Label($"Will be Modified: {modificationPreview.MaterialsToModify.Count}");
+            GUILayout.Label($"Will be Skipped: {modificationPreview.MaterialsToSkip.Count}");
+            GUILayout.Label($"Property: {modificationPreview.PropertyName} ({modificationPreview.PropertyType})");
+            GUILayout.Label($"Target Value: {GetValueDisplayString(modificationPreview.TargetValue)}");
+            
+            EditorGUILayout.EndVertical();
+            
+            // Toggle detailed preview
+            EditorGUILayout.BeginHorizontal();
+            string detailToggleText = showPreview ? "Hide Details" : "Show Details";
+            if (GUILayout.Button(detailToggleText, GUILayout.Width(100)))
+            {
+                showPreview = !showPreview;
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            if (showPreview)
+            {
+                DrawDetailedPreview();
+            }
+        }
+
+        /// <summary>
+        /// Draw detailed preview showing current vs target values
+        /// </summary>
+        private void DrawDetailedPreview()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            // Materials to modify
+            if (modificationPreview.MaterialsToModify.Count > 0)
+            {
+                GUILayout.Label("Materials to Modify:", EditorStyles.boldLabel);
+                
+                foreach (var modification in modificationPreview.MaterialsToModify)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    
+                    if (GUILayout.Button(modification.Material.name, EditorStyles.linkLabel, GUILayout.Width(150)))
+                    {
+                        Selection.activeObject = modification.Material;
+                        EditorGUIUtility.PingObject(modification.Material);
+                    }
+                    
+                    GUILayout.Label($"Current: {GetValueDisplayString(modification.CurrentValue)}", GUILayout.Width(120));
+                    GUILayout.Label("→", GUILayout.Width(20));
+                    GUILayout.Label($"Target: {GetValueDisplayString(modification.TargetValue)}", GUILayout.Width(120));
+                    
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+            
+            // Materials to skip
+            if (modificationPreview.MaterialsToSkip.Count > 0)
+            {
+                GUILayout.Space(10);
+                GUILayout.Label("Materials to Skip:", EditorStyles.boldLabel);
+                
+                foreach (var skipInfo in modificationPreview.MaterialsToSkip)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    
+                    if (GUILayout.Button(skipInfo.Material.name, EditorStyles.linkLabel, GUILayout.Width(150)))
+                    {
+                        Selection.activeObject = skipInfo.Material;
+                        EditorGUIUtility.PingObject(skipInfo.Material);
+                    }
+                    
+                    GUILayout.Label($"Reason: {skipInfo.Reason}", EditorStyles.miniLabel);
+                    
+                    EditorGUILayout.EndHorizontal();
+                }
             }
             
             EditorGUILayout.EndVertical();
@@ -859,6 +1128,139 @@ namespace MaterialPropertyModifier.Editor
                 Debug.LogError($"Error refreshing shader properties: {ex.Message}");
                 availableProperties = new string[0];
                 availablePropertyTypes = new ShaderPropertyType[0];
+            }
+        }
+
+        /// <summary>
+        /// Find materials using the selected folder and shader
+        /// </summary>
+        private void FindMaterials()
+        {
+            if (!isFolderValid || !isShaderValid)
+            {
+                return;
+            }
+
+            try
+            {
+                isSearching = true;
+                Repaint();
+
+                foundMaterials = modifier.FindMaterialsWithShader(folderPath, selectedShader);
+                
+                Debug.Log($"Found {foundMaterials.Count} materials using shader '{selectedShader.name}' in folder '{folderPath}'");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error finding materials: {ex.Message}");
+                foundMaterials = new System.Collections.Generic.List<Material>();
+            }
+            finally
+            {
+                isSearching = false;
+                Repaint();
+            }
+        }
+
+        /// <summary>
+        /// Get filtered materials based on search filter
+        /// </summary>
+        private System.Collections.Generic.List<Material> GetFilteredMaterials()
+        {
+            if (foundMaterials == null)
+            {
+                return new System.Collections.Generic.List<Material>();
+            }
+
+            if (string.IsNullOrEmpty(materialSearchFilter))
+            {
+                return foundMaterials;
+            }
+
+            var filtered = new System.Collections.Generic.List<Material>();
+            string filterLower = materialSearchFilter.ToLower();
+
+            foreach (var material in foundMaterials)
+            {
+                if (material.name.ToLower().Contains(filterLower))
+                {
+                    filtered.Add(material);
+                }
+            }
+
+            return filtered;
+        }
+
+        /// <summary>
+        /// Check if preview can be generated
+        /// </summary>
+        private bool CanGeneratePreview()
+        {
+            return isFolderValid && isShaderValid && isPropertyValid && 
+                   foundMaterials != null && foundMaterials.Count > 0 && 
+                   propertyValue != null;
+        }
+
+        /// <summary>
+        /// Generate modification preview
+        /// </summary>
+        private void GeneratePreview()
+        {
+            if (!CanGeneratePreview())
+            {
+                return;
+            }
+
+            try
+            {
+                var materialModificationData = new MaterialModificationData
+                {
+                    TargetFolder = folderPath,
+                    TargetShader = selectedShader,
+                    PropertyName = propertyName,
+                    PropertyValue = propertyValue,
+                    PropertyType = propertyType
+                };
+
+                modificationPreview = modifier.PreviewModifications(materialModificationData);
+                
+                Debug.Log($"Generated preview: {modificationPreview.MaterialsToModify.Count} to modify, {modificationPreview.MaterialsToSkip.Count} to skip");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error generating preview: {ex.Message}");
+                modificationPreview = null;
+            }
+        }
+
+        /// <summary>
+        /// Get display string for a property value
+        /// </summary>
+        private string GetValueDisplayString(object value)
+        {
+            if (value == null)
+            {
+                return "null";
+            }
+
+            switch (value)
+            {
+                case float f:
+                    return f.ToString("F3");
+                case int i:
+                    return i.ToString();
+                case Color c:
+                    return $"RGBA({c.r:F2}, {c.g:F2}, {c.b:F2}, {c.a:F2})";
+                case Vector4 v:
+                    return $"({v.x:F2}, {v.y:F2}, {v.z:F2}, {v.w:F2})";
+                case Vector3 v3:
+                    return $"({v3.x:F2}, {v3.y:F2}, {v3.z:F2})";
+                case Vector2 v2:
+                    return $"({v2.x:F2}, {v2.y:F2})";
+                case Texture tex:
+                    return tex != null ? tex.name : "null";
+                default:
+                    return value.ToString();
             }
         }
     }

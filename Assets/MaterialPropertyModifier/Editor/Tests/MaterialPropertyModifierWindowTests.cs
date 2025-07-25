@@ -138,5 +138,71 @@ namespace MaterialPropertyModifier.Editor.Tests
             
             Assert.IsNotNull(method, "GetSelectionStatusText method should exist for user feedback");
         }
+
+        [Test]
+        public void MaterialListMethods_Exist_ForMaterialDisplay()
+        {
+            // Verify material list methods exist
+            var findMaterials = typeof(MaterialPropertyModifierWindow).GetMethod("FindMaterials", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var getFilteredMaterials = typeof(MaterialPropertyModifierWindow).GetMethod("GetFilteredMaterials", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(findMaterials, "FindMaterials method should exist");
+            Assert.IsNotNull(getFilteredMaterials, "GetFilteredMaterials method should exist");
+        }
+
+        [Test]
+        public void PreviewMethods_Exist_ForModificationPreview()
+        {
+            // Verify preview methods exist
+            var canGeneratePreview = typeof(MaterialPropertyModifierWindow).GetMethod("CanGeneratePreview", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var generatePreview = typeof(MaterialPropertyModifierWindow).GetMethod("GeneratePreview", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var getValueDisplayString = typeof(MaterialPropertyModifierWindow).GetMethod("GetValueDisplayString", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(canGeneratePreview, "CanGeneratePreview method should exist");
+            Assert.IsNotNull(generatePreview, "GeneratePreview method should exist");
+            Assert.IsNotNull(getValueDisplayString, "GetValueDisplayString method should exist");
+        }
+
+        [Test]
+        public void DrawMethods_Exist_ForUIRendering()
+        {
+            // Verify UI drawing methods exist
+            var drawMaterialListSection = typeof(MaterialPropertyModifierWindow).GetMethod("DrawMaterialListSection", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var drawPreviewSection = typeof(MaterialPropertyModifierWindow).GetMethod("DrawPreviewSection", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(drawMaterialListSection, "DrawMaterialListSection method should exist");
+            Assert.IsNotNull(drawPreviewSection, "DrawPreviewSection method should exist");
+        }
+
+        [Test]
+        public void WindowFields_ExistForState_MaterialListAndPreview()
+        {
+            // Verify required fields exist for material list and preview functionality
+            var type = typeof(MaterialPropertyModifierWindow);
+            
+            var foundMaterialsField = type.GetField("foundMaterials", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var modificationPreviewField = type.GetField("modificationPreview", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var materialListScrollPositionField = type.GetField("materialListScrollPosition", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(foundMaterialsField, "foundMaterials field should exist");
+            Assert.IsNotNull(modificationPreviewField, "modificationPreview field should exist");
+            Assert.IsNotNull(materialListScrollPositionField, "materialListScrollPosition field should exist");
+        }
     }
 }
