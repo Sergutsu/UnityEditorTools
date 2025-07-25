@@ -204,5 +204,91 @@ namespace MaterialPropertyModifier.Editor.Tests
             Assert.IsNotNull(modificationPreviewField, "modificationPreview field should exist");
             Assert.IsNotNull(materialListScrollPositionField, "materialListScrollPosition field should exist");
         }
+
+        [Test]
+        public void OperationControlMethods_Exist_ForOperationManagement()
+        {
+            // Verify operation control methods exist
+            var canApplyModifications = typeof(MaterialPropertyModifierWindow).GetMethod("CanApplyModifications", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var startPreviewOperation = typeof(MaterialPropertyModifierWindow).GetMethod("StartPreviewOperation", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var startApplyOperation = typeof(MaterialPropertyModifierWindow).GetMethod("StartApplyOperation", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(canApplyModifications, "CanApplyModifications method should exist");
+            Assert.IsNotNull(startPreviewOperation, "StartPreviewOperation method should exist");
+            Assert.IsNotNull(startApplyOperation, "StartApplyOperation method should exist");
+        }
+
+        [Test]
+        public void OperationFeedbackMethods_Exist_ForUserFeedback()
+        {
+            // Verify operation feedback methods exist
+            var startOperation = typeof(MaterialPropertyModifierWindow).GetMethod("StartOperation", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var completeOperation = typeof(MaterialPropertyModifierWindow).GetMethod("CompleteOperation", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var cancelOperation = typeof(MaterialPropertyModifierWindow).GetMethod("CancelOperation", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var addToOperationLog = typeof(MaterialPropertyModifierWindow).GetMethod("AddToOperationLog", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(startOperation, "StartOperation method should exist");
+            Assert.IsNotNull(completeOperation, "CompleteOperation method should exist");
+            Assert.IsNotNull(cancelOperation, "CancelOperation method should exist");
+            Assert.IsNotNull(addToOperationLog, "AddToOperationLog method should exist");
+        }
+
+        [Test]
+        public void OperationDrawMethods_Exist_ForUIRendering()
+        {
+            // Verify operation UI drawing methods exist
+            var drawOperationControlsSection = typeof(MaterialPropertyModifierWindow).GetMethod("DrawOperationControlsSection", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var drawOperationProgress = typeof(MaterialPropertyModifierWindow).GetMethod("DrawOperationProgress", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var drawOperationFeedbackSection = typeof(MaterialPropertyModifierWindow).GetMethod("DrawOperationFeedbackSection", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var drawOperationLog = typeof(MaterialPropertyModifierWindow).GetMethod("DrawOperationLog", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(drawOperationControlsSection, "DrawOperationControlsSection method should exist");
+            Assert.IsNotNull(drawOperationProgress, "DrawOperationProgress method should exist");
+            Assert.IsNotNull(drawOperationFeedbackSection, "DrawOperationFeedbackSection method should exist");
+            Assert.IsNotNull(drawOperationLog, "DrawOperationLog method should exist");
+        }
+
+        [Test]
+        public void OperationStateFields_ExistForState_OperationTracking()
+        {
+            // Verify required fields exist for operation state tracking
+            var type = typeof(MaterialPropertyModifierWindow);
+            
+            var isOperationInProgressField = type.GetField("isOperationInProgress", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var operationStatusField = type.GetField("operationStatus", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var operationProgressField = type.GetField("operationProgress", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var operationLogField = type.GetField("operationLog", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(isOperationInProgressField, "isOperationInProgress field should exist");
+            Assert.IsNotNull(operationStatusField, "operationStatus field should exist");
+            Assert.IsNotNull(operationProgressField, "operationProgress field should exist");
+            Assert.IsNotNull(operationLogField, "operationLog field should exist");
+        }
     }
 }

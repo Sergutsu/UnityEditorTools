@@ -56,6 +56,19 @@ namespace MaterialPropertyModifier.Editor
         private string materialSearchFilter = "";
         private bool isSearching = false;
         
+        // Operation controls and feedback state
+        private bool isOperationInProgress = false;
+        private bool isPreviewInProgress = false;
+        private bool isApplyInProgress = false;
+        private string operationStatus = "";
+        private float operationProgress = 0f;
+        private bool showOperationResults = false;
+        private string operationResultMessage = "";
+        private MessageType operationResultType = MessageType.Info;
+        private System.Collections.Generic.List<string> operationLog;
+        private Vector2 operationLogScrollPosition;
+        private bool operationCancelled = false;
+        
         // UI Layout constants
         private const float WINDOW_MIN_WIDTH = 400f;
         private const float WINDOW_MIN_HEIGHT = 500f;
@@ -187,6 +200,14 @@ namespace MaterialPropertyModifier.Editor
             GUILayout.Space(SECTION_SPACING);
             
             DrawPreviewSection();
+            
+            GUILayout.Space(SECTION_SPACING);
+            
+            DrawOperationControlsSection();
+            
+            GUILayout.Space(SECTION_SPACING);
+            
+            DrawOperationFeedbackSection();
             
             GUILayout.Space(SECTION_SPACING);
             
@@ -764,6 +785,142 @@ namespace MaterialPropertyModifier.Editor
         }
 
         /// <summary>
+        /// Draw operation controls section
+        /// </summary>
+        private void DrawOperationControlsSection()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            GUILayout.Label("Operations", EditorStyles.boldLabel);
+            
+            // Operation buttons
+            EditorGUILayout.BeginHorizontal();
+            
+            // Preview button
+            GUI.enabled = CanGeneratePreview() && !isOperationInProgress;
+            if (GUILayout.Button("Preview Changes", GUILayout.Height(30)))
+            {
+                StartPreviewOperation();
+            }
+            
+            // Apply button
+            GUI.enabled = CanApplyModifications() && !isOperationInProgress;
+            if (GUILayout.Button("Apply Changes", GUILayout.Height(30)))
+            {
+                StartApplyOperation();
+            }
+            
+            GUI.enabled = true;
+            
+            EditorGUILayout.EndHorizontal();
+            
+            // Operation progress
+            if (isOperationInProgress)
+            {
+                DrawOperationProgress();
+            }
+            
+            // Cancel button during operations
+            if (isOperationInProgress)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                
+                if (GUILayout.Button("Cancel Operation", GUILayout.Width(120), GUILayout.Height(25)))
+                {
+                    CancelOperation();
+                }
+                
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw operation progress indicator
+        /// </summary>
+        private void DrawOperationProgress()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            // Status text
+            if (!string.IsNullOrEmpty(operationStatus))
+            {
+                GUILayout.Label(operationStatus, EditorStyles.boldLabel);
+            }
+            
+            // Progress bar
+            Rect progressRect = EditorGUILayout.GetControlRect(false, 20);
+            EditorGUI.ProgressBar(progressRect, operationProgress, $"{(operationProgress * 100):F0}%");
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw operation feedback section
+        /// </summary>
+        private void DrawOperationFeedbackSection()
+        {
+            if (!showOperationResults && (operationLog == null || operationLog.Count == 0))
+            {
+                return;
+            }
+            
+            EditorGUILayout.BeginVertical("box");
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Operation Results", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            
+            if (GUILayout.Button("Clear Results", GUILayout.Width(100)))
+            {
+                ClearOperationResults();
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            
+            // Operation result message
+            if (showOperationResults && !string.IsNullOrEmpty(operationResultMessage))
+            {
+                EditorGUILayout.HelpBox(operationResultMessage, operationResultType);
+            }
+            
+            // Operation log
+            if (operationLog != null && operationLog.Count > 0)
+            {
+                DrawOperationLog();
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw operation log
+        /// </summary>
+        private void DrawOperationLog()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            GUILayout.Label("Operation Log:", EditorStyles.boldLabel);
+            
+            operationLogScrollPosition = EditorGUILayout.BeginScrollView(
+                operationLogScrollPosition, 
+                GUILayout.MaxHeight(150)
+            );
+            
+            foreach (string logEntry in operationLog)
+            {
+                GUILayout.Label(logEntry, EditorStyles.miniLabel);
+            }
+            
+            EditorGUILayout.EndScrollView();
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
         /// Draw status information section
         /// </summary>
         private void DrawStatusSection()
@@ -1262,6 +1419,229 @@ namespace MaterialPropertyModifier.Editor
                 default:
                     return value.ToString();
             }
+        }
+
+        /// <summary>
+        /// Check if modifications can be applied
+        /// </summary>
+        private bool CanApplyModifications()
+        {
+            return CanGeneratePreview() && modificationPreview != null && 
+                   modificationPreview.MaterialsToModify.Count > 0;
+        }
+
+        /// <summary>
+        /// Start preview operation
+        /// </summary>
+        private void StartPreviewOperation()
+        {
+            if (isOperationInProgress)
+                return;
+
+            StartOperation("Generating preview...");
+            isPreviewInProgress = true;
+
+            try
+            {
+                // Simulate progress for preview generation
+                for (int i = 0; i <= 100; i += 20)
+                {
+                    if (operationCancelled)
+                    {
+                        CompleteOperation("Preview cancelled", MessageType.Warning);
+                        return;
+                    }
+                    
+                    operationProgress = i / 100f;
+                    operationStatus = $"Generating preview... {i}%";
+                    Repaint();
+                    
+                    // Small delay to show progress
+                    System.Threading.Thread.Sleep(100);
+                }
+
+                GeneratePreview();
+                
+                if (modificationPreview != null)
+                {
+                    string message = $"Preview generated successfully. {modificationPreview.MaterialsToModify.Count} materials will be modified, {modificationPreview.MaterialsToSkip.Count} will be skipped.";
+                    CompleteOperation(message, MessageType.Info);
+                    
+                    AddToOperationLog($"Preview generated at {System.DateTime.Now:HH:mm:ss}");
+                    AddToOperationLog($"Materials to modify: {modificationPreview.MaterialsToModify.Count}");
+                    AddToOperationLog($"Materials to skip: {modificationPreview.MaterialsToSkip.Count}");
+                }
+                else
+                {
+                    CompleteOperation("Failed to generate preview", MessageType.Error);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                CompleteOperation($"Preview generation failed: {ex.Message}", MessageType.Error);
+                Debug.LogError($"Preview generation error: {ex.Message}\n{ex.StackTrace}");
+            }
+            finally
+            {
+                isPreviewInProgress = false;
+            }
+        }
+
+        /// <summary>
+        /// Start apply operation
+        /// </summary>
+        private void StartApplyOperation()
+        {
+            if (isOperationInProgress || modificationPreview == null)
+                return;
+
+            // Confirmation dialog
+            if (!EditorUtility.DisplayDialog(
+                "Apply Material Modifications",
+                $"This will modify {modificationPreview.MaterialsToModify.Count} materials.\n\nThis action cannot be undone automatically. Make sure you have backups.\n\nContinue?",
+                "Apply Changes",
+                "Cancel"))
+            {
+                return;
+            }
+
+            StartOperation("Applying modifications...");
+            isApplyInProgress = true;
+
+            try
+            {
+                var materialModificationData = new MaterialModificationData
+                {
+                    TargetFolder = folderPath,
+                    TargetShader = selectedShader,
+                    PropertyName = propertyName,
+                    PropertyValue = propertyValue,
+                    PropertyType = propertyType
+                };
+
+                int totalMaterials = modificationPreview.MaterialsToModify.Count;
+                int processedMaterials = 0;
+
+                AddToOperationLog($"Starting modification of {totalMaterials} materials at {System.DateTime.Now:HH:mm:ss}");
+
+                foreach (var modification in modificationPreview.MaterialsToModify)
+                {
+                    if (operationCancelled)
+                    {
+                        CompleteOperation("Operation cancelled", MessageType.Warning);
+                        return;
+                    }
+
+                    try
+                    {
+                        // Apply modification using core logic
+                        var result = modifier.ApplyModifications(materialModificationData);
+                        
+                        processedMaterials++;
+                        operationProgress = (float)processedMaterials / totalMaterials;
+                        operationStatus = $"Applying modifications... {processedMaterials}/{totalMaterials}";
+                        
+                        AddToOperationLog($"✓ Modified {modification.Material.name}");
+                        
+                        Repaint();
+                        
+                        // Small delay to show progress
+                        System.Threading.Thread.Sleep(50);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        AddToOperationLog($"✗ Failed to modify {modification.Material.name}: {ex.Message}");
+                        Debug.LogError($"Failed to modify material {modification.Material.name}: {ex.Message}");
+                    }
+                }
+
+                string message = $"Applied modifications to {processedMaterials} materials successfully.";
+                CompleteOperation(message, MessageType.Info);
+                
+                AddToOperationLog($"Operation completed at {System.DateTime.Now:HH:mm:ss}");
+                AddToOperationLog($"Successfully modified: {processedMaterials} materials");
+            }
+            catch (System.Exception ex)
+            {
+                CompleteOperation($"Apply operation failed: {ex.Message}", MessageType.Error);
+                Debug.LogError($"Apply operation error: {ex.Message}\n{ex.StackTrace}");
+            }
+            finally
+            {
+                isApplyInProgress = false;
+            }
+        }
+
+        /// <summary>
+        /// Start an operation with progress tracking
+        /// </summary>
+        private void StartOperation(string status)
+        {
+            isOperationInProgress = true;
+            operationCancelled = false;
+            operationStatus = status;
+            operationProgress = 0f;
+            
+            if (operationLog == null)
+            {
+                operationLog = new System.Collections.Generic.List<string>();
+            }
+        }
+
+        /// <summary>
+        /// Complete an operation with result message
+        /// </summary>
+        private void CompleteOperation(string message, MessageType messageType)
+        {
+            isOperationInProgress = false;
+            isPreviewInProgress = false;
+            isApplyInProgress = false;
+            operationStatus = "";
+            operationProgress = 0f;
+            
+            showOperationResults = true;
+            operationResultMessage = message;
+            operationResultType = messageType;
+            
+            Repaint();
+        }
+
+        /// <summary>
+        /// Cancel the current operation
+        /// </summary>
+        private void CancelOperation()
+        {
+            operationCancelled = true;
+            AddToOperationLog($"Operation cancelled by user at {System.DateTime.Now:HH:mm:ss}");
+        }
+
+        /// <summary>
+        /// Add entry to operation log
+        /// </summary>
+        private void AddToOperationLog(string message)
+        {
+            if (operationLog == null)
+            {
+                operationLog = new System.Collections.Generic.List<string>();
+            }
+            
+            operationLog.Add($"[{System.DateTime.Now:HH:mm:ss}] {message}");
+            
+            // Keep log size manageable
+            if (operationLog.Count > 100)
+            {
+                operationLog.RemoveAt(0);
+            }
+        }
+
+        /// <summary>
+        /// Clear operation results and log
+        /// </summary>
+        private void ClearOperationResults()
+        {
+            showOperationResults = false;
+            operationResultMessage = "";
+            operationLog?.Clear();
         }
     }
 }
