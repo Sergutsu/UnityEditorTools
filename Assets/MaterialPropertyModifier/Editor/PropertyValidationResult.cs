@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 
+
 namespace MaterialPropertyModifier.Editor
 {
     /// <summary>
@@ -25,4 +26,6 @@ namespace MaterialPropertyModifier.Editor
             PropertyType = propertyType;
         }
     }
+
+
 }
