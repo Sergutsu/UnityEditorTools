@@ -29,42 +29,42 @@ namespace MaterialPropertyModifier.Editor
                 var result = operation();
                 
                 LogWithThrottling($"Completed {operationName} successfully", LogLevel.Info);
-                return OperationResult<T>.Success(result);
+                return new OperationResult<T>(result);
             }
             catch (ArgumentNullException ex)
             {
                 string errorMsg = $"Null argument in {operationName}: {ex.ParamName}";
                 LogError(operationName, errorMsg, ex);
                 if (showUserDialog) ShowErrorToUser("Invalid Input", errorMsg);
-                return OperationResult<T>.Failure(errorMsg, ex);
+                return new OperationResult<T>(errorMsg) { Exception = ex };
             }
             catch (ArgumentException ex)
             {
                 string errorMsg = $"Invalid argument in {operationName}: {ex.Message}";
                 LogError(operationName, errorMsg, ex);
                 if (showUserDialog) ShowErrorToUser("Invalid Input", errorMsg);
-                return OperationResult<T>.Failure(errorMsg, ex);
+                return new OperationResult<T>(errorMsg) { Exception = ex };
             }
             catch (UnityException ex)
             {
                 string errorMsg = $"Unity error in {operationName}: {ex.Message}";
                 LogError(operationName, errorMsg, ex);
                 if (showUserDialog) ShowErrorToUser("Unity Error", errorMsg);
-                return OperationResult<T>.Failure(errorMsg, ex);
+                return new OperationResult<T>(errorMsg) { Exception = ex };
             }
             catch (System.IO.IOException ex)
             {
                 string errorMsg = $"File I/O error in {operationName}: {ex.Message}";
                 LogError(operationName, errorMsg, ex);
                 if (showUserDialog) ShowErrorToUser("File Error", errorMsg);
-                return OperationResult<T>.Failure(errorMsg, ex);
+                return new OperationResult<T>(errorMsg) { Exception = ex };
             }
             catch (Exception ex)
             {
                 string errorMsg = $"Unexpected error in {operationName}: {ex.Message}";
                 LogError(operationName, errorMsg, ex);
                 if (showUserDialog) ShowErrorToUser("Unexpected Error", errorMsg);
-                return OperationResult<T>.Failure(errorMsg, ex);
+                return new OperationResult<T>(errorMsg) { Exception = ex };
             }
         }
 
