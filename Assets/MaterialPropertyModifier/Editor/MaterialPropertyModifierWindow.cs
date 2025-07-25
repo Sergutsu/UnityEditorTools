@@ -87,11 +87,60 @@ namespace MaterialPropertyModifier.Editor
         }
 
         /// <summary>
+        /// Menu item to perform system health check
+        /// </summary>
+        [MenuItem("Tools/Material Property Modifier/System Health Check")]
+        public static void PerformSystemHealthCheck()
+        {
+            var modifier = new MaterialPropertyModifier();
+            var healthCheckResult = modifier.PerformHealthCheck();
+            
+            if (healthCheckResult.IsSuccess)
+            {
+                var health = healthCheckResult.Data;
+                string healthMessage = $"System Health Check Results:\n\n";
+                healthMessage += $"Overall Health: {(health.OverallHealth ? "HEALTHY" : "UNHEALTHY")}\n";
+                healthMessage += $"Health Score: {health.HealthScore:P1}\n";
+                healthMessage += $"Passed Checks: {health.PassedChecks}/{health.TotalChecks}\n\n";
+
+                if (health.FailedChecks.Count > 0)
+                {
+                    healthMessage += "Failed Checks:\n";
+                    foreach (var failedCheck in health.FailedChecks)
+                    {
+                        healthMessage += $"• {failedCheck}\n";
+                    }
+                }
+
+                if (health.OverallHealth)
+                {
+                    EditorUtility.DisplayDialog("Health Check - Healthy", healthMessage, "OK");
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Health Check - Issues Found", healthMessage, "OK");
+                }
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Health Check Failed", $"Could not perform system health check:\n\n{healthCheckResult.ErrorMessage}", "OK");
+            }
+        }
+
+        /// <summary>
         /// Initialize the window when it's first opened
         /// </summary>
         private void OnEnable()
         {
-            InitializeWindow();
+            try
+            {
+                InitializeWindow();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MaterialPropertyModifierWindow] Failed to initialize window: {ex.Message}\n{ex.StackTrace}");
+                ShowErrorDialog("Window Initialization Error", $"Failed to initialize Material Property Modifier window:\n\n{ex.Message}");
+            }
         }
 
         /// <summary>
@@ -99,21 +148,39 @@ namespace MaterialPropertyModifier.Editor
         /// </summary>
         private void InitializeWindow()
         {
-            if (modifier == null)
+            try
             {
-                modifier = new MaterialPropertyModifier();
+                if (modifier == null)
+                {
+                    modifier = new MaterialPropertyModifier();
+                }
+                
+                // Validate system prerequisites
+                var systemValidation = modifier.ValidateSystemPrerequisites();
+                if (!systemValidation.IsValid)
+                {
+                    ShowErrorDialog("System Validation Error", systemValidation.ErrorMessage);
+                    return;
+                }
+                
+                // Initialize shader list
+                RefreshShaderList();
+                
+                // Initialize folder from current selection if applicable
+                InitializeFolderFromSelection();
+                
+                isInitialized = true;
+                
+                // Set window title and icon
+                titleContent = new GUIContent("Material Property Modifier", "Batch modify material properties");
+                
+                Debug.Log("[MaterialPropertyModifierWindow] Window initialized successfully");
             }
-            
-            // Initialize shader list
-            RefreshShaderList();
-            
-            // Initialize folder from current selection if applicable
-            InitializeFolderFromSelection();
-            
-            isInitialized = true;
-            
-            // Set window title and icon
-            titleContent = new GUIContent("Material Property Modifier", "Batch modify material properties");
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MaterialPropertyModifierWindow] Window initialization failed: {ex.Message}\n{ex.StackTrace}");
+                ShowErrorDialog("Initialization Error", $"Failed to initialize window:\n\n{ex.Message}");
+            }
         }
 
         /// <summary>
@@ -1295,6 +1362,7 @@ namespace MaterialPropertyModifier.Editor
         {
             if (!isFolderValid || !isShaderValid)
             {
+                AddToOperationLog("Cannot find materials: Invalid folder or shader selection");
                 return;
             }
 
@@ -1303,14 +1371,28 @@ namespace MaterialPropertyModifier.Editor
                 isSearching = true;
                 Repaint();
 
-                foundMaterials = modifier.FindMaterialsWithShader(folderPath, selectedShader);
+                // Use enhanced method with comprehensive error handling
+                var discoveryResult = modifier.FindMaterialsWithShaderEnhanced(folderPath, selectedShader);
                 
-                Debug.Log($"Found {foundMaterials.Count} materials using shader '{selectedShader.name}' in folder '{folderPath}'");
+                if (discoveryResult.IsSuccess)
+                {
+                    foundMaterials = discoveryResult.Materials;
+                    AddToOperationLog($"Successfully found {foundMaterials.Count} materials using shader '{selectedShader.name}' in folder '{folderPath}'");
+                    Debug.Log($"[MaterialPropertyModifierWindow] Found {foundMaterials.Count} materials");
+                }
+                else
+                {
+                    foundMaterials = new System.Collections.Generic.List<Material>();
+                    AddToOperationLog($"Material discovery failed: {discoveryResult.ErrorMessage}");
+                    ShowErrorDialog("Material Discovery Error", discoveryResult.ErrorMessage);
+                }
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"Error finding materials: {ex.Message}");
+                Debug.LogError($"[MaterialPropertyModifierWindow] Unexpected error finding materials: {ex.Message}\n{ex.StackTrace}");
                 foundMaterials = new System.Collections.Generic.List<Material>();
+                AddToOperationLog($"Unexpected error during material discovery: {ex.Message}");
+                ShowErrorDialog("Unexpected Error", $"An unexpected error occurred while finding materials:\n\n{ex.Message}");
             }
             finally
             {
@@ -1365,6 +1447,7 @@ namespace MaterialPropertyModifier.Editor
         {
             if (!CanGeneratePreview())
             {
+                AddToOperationLog("Cannot generate preview: Prerequisites not met");
                 return;
             }
 
@@ -1379,14 +1462,28 @@ namespace MaterialPropertyModifier.Editor
                     PropertyType = propertyType
                 };
 
-                modificationPreview = modifier.PreviewModifications(materialModificationData);
+                // Use enhanced method with comprehensive error handling
+                var previewResult = modifier.PreviewModificationsEnhanced(materialModificationData);
                 
-                Debug.Log($"Generated preview: {modificationPreview.MaterialsToModify.Count} to modify, {modificationPreview.MaterialsToSkip.Count} to skip");
+                if (previewResult.IsSuccess)
+                {
+                    modificationPreview = previewResult.Preview;
+                    AddToOperationLog($"Successfully generated preview: {modificationPreview.MaterialsToModify.Count} to modify, {modificationPreview.MaterialsToSkip.Count} to skip");
+                    Debug.Log($"[MaterialPropertyModifierWindow] Generated preview successfully");
+                }
+                else
+                {
+                    modificationPreview = null;
+                    AddToOperationLog($"Preview generation failed: {previewResult.ErrorMessage}");
+                    ShowErrorDialog("Preview Generation Error", previewResult.ErrorMessage);
+                }
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"Error generating preview: {ex.Message}");
+                Debug.LogError($"[MaterialPropertyModifierWindow] Unexpected error generating preview: {ex.Message}\n{ex.StackTrace}");
                 modificationPreview = null;
+                AddToOperationLog($"Unexpected error during preview generation: {ex.Message}");
+                ShowErrorDialog("Unexpected Error", $"An unexpected error occurred while generating preview:\n\n{ex.Message}");
             }
         }
 
@@ -1534,8 +1631,8 @@ namespace MaterialPropertyModifier.Editor
 
                     try
                     {
-                        // Apply modification using core logic
-                        var result = modifier.ApplyModifications(materialModificationData);
+                        // Apply modification using enhanced core logic
+                        var result = modifier.ApplyModificationsEnhanced(materialModificationData);
                         
                         processedMaterials++;
                         operationProgress = (float)processedMaterials / totalMaterials;
@@ -1642,6 +1739,270 @@ namespace MaterialPropertyModifier.Editor
             showOperationResults = false;
             operationResultMessage = "";
             operationLog?.Clear();
+        }
+
+        /// <summary>
+        /// Show error dialog with comprehensive error information
+        /// </summary>
+        /// <param name="title">Dialog title</param>
+        /// <param name="message">Error message</param>
+        /// <param name="exception">Optional exception for detailed information</param>
+        private void ShowErrorDialog(string title, string message, System.Exception exception = null)
+        {
+            try
+            {
+                string fullMessage = message;
+                
+                if (exception != null)
+                {
+                    fullMessage += $"\n\nTechnical Details:\n{exception.Message}";
+                    
+                    if (exception.InnerException != null)
+                    {
+                        fullMessage += $"\n\nInner Exception:\n{exception.InnerException.Message}";
+                    }
+                }
+
+                // Log the error for debugging
+                if (exception != null)
+                {
+                    Debug.LogError($"[MaterialPropertyModifierWindow] {title}: {message}\nException: {exception}");
+                }
+                else
+                {
+                    Debug.LogError($"[MaterialPropertyModifierWindow] {title}: {message}");
+                }
+
+                // Show dialog with options
+                int choice = EditorUtility.DisplayDialogComplex(
+                    title,
+                    fullMessage,
+                    "OK",
+                    "Copy to Clipboard",
+                    "Show Details"
+                );
+
+                switch (choice)
+                {
+                    case 1: // Copy to Clipboard
+                        EditorGUIUtility.systemCopyBuffer = $"{title}\n\n{fullMessage}";
+                        Debug.Log("Error details copied to clipboard");
+                        break;
+                    case 2: // Show Details
+                        ShowDetailedErrorDialog(title, message, exception);
+                        break;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[MaterialPropertyModifierWindow] Failed to show error dialog: {ex.Message}");
+                // Fallback to simple dialog
+                EditorUtility.DisplayDialog("Error", $"{title}\n\n{message}", "OK");
+            }
+        }
+
+        /// <summary>
+        /// Show detailed error dialog with full exception information
+        /// </summary>
+        /// <param name="title">Dialog title</param>
+        /// <param name="message">Error message</param>
+        /// <param name="exception">Exception details</param>
+        private void ShowDetailedErrorDialog(string title, string message, System.Exception exception)
+        {
+            string detailedMessage = $"Error: {message}\n\n";
+            
+            if (exception != null)
+            {
+                detailedMessage += $"Exception Type: {exception.GetType().Name}\n";
+                detailedMessage += $"Message: {exception.Message}\n";
+                detailedMessage += $"Stack Trace:\n{exception.StackTrace}\n";
+                
+                if (exception.InnerException != null)
+                {
+                    detailedMessage += $"\nInner Exception: {exception.InnerException.GetType().Name}\n";
+                    detailedMessage += $"Inner Message: {exception.InnerException.Message}\n";
+                }
+            }
+
+            // Create a scrollable text area for long error messages
+            var detailWindow = EditorWindow.GetWindow<ErrorDetailWindow>("Error Details");
+            detailWindow.SetErrorDetails(title, detailedMessage);
+            detailWindow.Show();
+        }
+
+        /// <summary>
+        /// Enhanced operation execution with comprehensive error handling and user feedback
+        /// </summary>
+        /// <param name="operation">Operation to execute</param>
+        /// <param name="operationName">Name of the operation for logging</param>
+        /// <param name="showProgressBar">Whether to show progress bar</param>
+        /// <returns>True if operation succeeded</returns>
+        private bool ExecuteOperationWithFeedback(System.Action operation, string operationName, bool showProgressBar = true)
+        {
+            try
+            {
+                if (showProgressBar)
+                {
+                    EditorUtility.DisplayProgressBar("Material Property Modifier", $"Executing {operationName}...", 0.5f);
+                }
+
+                AddToOperationLog($"Starting {operationName}...");
+                modifier.LogWithContext(LogLevel.Info, "WindowOperation", $"Starting {operationName}");
+
+                operation();
+
+                AddToOperationLog($"✓ {operationName} completed successfully");
+                modifier.LogWithContext(LogLevel.Info, "WindowOperation", $"{operationName} completed successfully");
+                
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                AddToOperationLog($"✗ {operationName} failed: {ex.Message}");
+                modifier.LogWithContext(LogLevel.Error, "WindowOperation", $"{operationName} failed", ex.Message);
+                ShowErrorDialog($"{operationName} Failed", $"An error occurred while executing {operationName}:", ex);
+                return false;
+            }
+            finally
+            {
+                if (showProgressBar)
+                {
+                    EditorUtility.ClearProgressBar();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Perform comprehensive health check and display results
+        /// </summary>
+        private void PerformHealthCheck()
+        {
+            ExecuteOperationWithFeedback(() =>
+            {
+                var healthCheckResult = modifier.PerformHealthCheck();
+                
+                if (healthCheckResult.IsSuccess)
+                {
+                    var health = healthCheckResult.Data;
+                    string healthMessage = $"System Health Check Results:\n\n";
+                    healthMessage += $"Overall Health: {(health.OverallHealth ? "HEALTHY" : "UNHEALTHY")}\n";
+                    healthMessage += $"Health Score: {health.HealthScore:P1}\n";
+                    healthMessage += $"Passed Checks: {health.PassedChecks}/{health.TotalChecks}\n\n";
+
+                    if (health.FailedChecks.Count > 0)
+                    {
+                        healthMessage += "Failed Checks:\n";
+                        foreach (var failedCheck in health.FailedChecks)
+                        {
+                            healthMessage += $"• {failedCheck}\n";
+                        }
+                    }
+
+                    if (health.OverallHealth)
+                    {
+                        EditorUtility.DisplayDialog("Health Check - Healthy", healthMessage, "OK");
+                    }
+                    else
+                    {
+                        ShowErrorDialog("Health Check - Issues Found", healthMessage);
+                    }
+                }
+                else
+                {
+                    ShowErrorDialog("Health Check Failed", "Could not perform system health check", healthCheckResult.Exception);
+                }
+            }, "Health Check", true);
+        }
+
+        /// <summary>
+        /// Execute integrated workflow with comprehensive error handling
+        /// </summary>
+        /// <param name="previewOnly">Whether to only generate preview</param>
+        private void ExecuteIntegratedWorkflow(bool previewOnly = false)
+        {
+            ExecuteOperationWithFeedback(() =>
+            {
+                var workflowResult = modifier.ExecuteIntegratedWorkflow(
+                    folderPath, 
+                    selectedShader, 
+                    propertyName, 
+                    propertyValue, 
+                    previewOnly
+                );
+
+                if (workflowResult.IsSuccess)
+                {
+                    var workflow = workflowResult.Data;
+                    
+                    // Update UI with results
+                    foundMaterials = workflow.DiscoveredMaterials;
+                    modificationPreview = workflow.Preview;
+                    
+                    string resultMessage = $"Integrated Workflow Results:\n\n";
+                    resultMessage += $"Materials Found: {workflow.MaterialCount}\n";
+                    resultMessage += $"Materials to Modify: {workflow.MaterialsToModify}\n";
+                    resultMessage += $"Materials to Skip: {workflow.MaterialsToSkip}\n";
+                    
+                    if (!previewOnly && workflow.ModificationsApplied)
+                    {
+                        resultMessage += $"Successful Modifications: {workflow.SuccessfulModifications}\n";
+                        resultMessage += $"Failed Modifications: {workflow.FailedModifications}\n";
+                    }
+
+                    AddToOperationLog($"Integrated workflow completed: {resultMessage.Replace("\n", " | ")}");
+                    
+                    if (!previewOnly && workflow.ModificationsApplied)
+                    {
+                        EditorUtility.DisplayDialog("Workflow Complete", resultMessage, "OK");
+                    }
+                }
+                else
+                {
+                    ShowErrorDialog("Integrated Workflow Failed", workflowResult.ErrorMessage, workflowResult.Exception);
+                }
+            }, previewOnly ? "Integrated Preview" : "Integrated Workflow", true);
+        }
+    }
+
+    /// <summary>
+    /// Separate window for displaying detailed error information
+    /// </summary>
+    public class ErrorDetailWindow : EditorWindow
+    {
+        private string errorTitle;
+        private string errorDetails;
+        private Vector2 scrollPosition;
+
+        public void SetErrorDetails(string title, string details)
+        {
+            errorTitle = title;
+            errorDetails = details;
+        }
+
+        private void OnGUI()
+        {
+            EditorGUILayout.LabelField(errorTitle, EditorStyles.boldLabel);
+            EditorGUILayout.Space();
+
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            EditorGUILayout.TextArea(errorDetails, GUILayout.ExpandHeight(true));
+            EditorGUILayout.EndScrollView();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.BeginHorizontal();
+            
+            if (GUILayout.Button("Copy to Clipboard"))
+            {
+                EditorGUIUtility.systemCopyBuffer = $"{errorTitle}\n\n{errorDetails}";
+                Debug.Log("Error details copied to clipboard");
+            }
+            
+            if (GUILayout.Button("Close"))
+            {
+                Close();
+            }
+            
+            EditorGUILayout.EndHorizontal();
         }
     }
 }
