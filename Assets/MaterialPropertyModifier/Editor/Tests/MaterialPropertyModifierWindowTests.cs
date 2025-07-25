@@ -94,5 +94,49 @@ namespace MaterialPropertyModifier.Editor.Tests
                 typeof(MaterialPropertyModifierWindow).Namespace,
                 "Window should be in MaterialPropertyModifier.Editor namespace");
         }
+
+        [Test]
+        public void OnSelectionChange_MethodExists_ForFolderSelection()
+        {
+            // Verify OnSelectionChange method exists for folder auto-selection
+            var method = typeof(MaterialPropertyModifierWindow).GetMethod("OnSelectionChange", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(method, "OnSelectionChange method should exist for folder auto-selection");
+        }
+
+        [Test]
+        public void RefreshShaderList_MethodExists_ForShaderManagement()
+        {
+            // Verify RefreshShaderList method exists
+            var method = typeof(MaterialPropertyModifierWindow).GetMethod("RefreshShaderList", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(method, "RefreshShaderList method should exist for shader management");
+        }
+
+        [Test]
+        public void FolderValidation_MethodsExist_ForInputValidation()
+        {
+            // Verify folder validation methods exist
+            var onFolderChanged = typeof(MaterialPropertyModifierWindow).GetMethod("OnFolderSelectionChanged", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            var onShaderChanged = typeof(MaterialPropertyModifierWindow).GetMethod("OnShaderSelectionChanged", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(onFolderChanged, "OnFolderSelectionChanged method should exist");
+            Assert.IsNotNull(onShaderChanged, "OnShaderSelectionChanged method should exist");
+        }
+
+        [Test]
+        public void StatusValidation_MethodExists_ForUserFeedback()
+        {
+            // Verify status validation method exists
+            var method = typeof(MaterialPropertyModifierWindow).GetMethod("GetSelectionStatusText", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            Assert.IsNotNull(method, "GetSelectionStatusText method should exist for user feedback");
+        }
     }
 }
