@@ -166,5 +166,110 @@ namespace MaterialPropertyModifier.Editor
 
             return pathDictionary;
         }
+
+        /// <summary>
+        /// Validates that a target value is appropriate for the given property type
+        /// </summary>
+        /// <param name="propertyType">The shader property type</param>
+        /// <param name="targetValue">The value to validate</param>
+        /// <returns>PropertyValidationResult indicating if the value is valid for the property type</returns>
+        public PropertyValidationResult ValidatePropertyValue(ShaderPropertyType propertyType, object targetValue)
+        {
+            if (targetValue == null)
+            {
+                return new PropertyValidationResult(false, "Target value cannot be null");
+            }
+
+            try
+            {
+                switch (propertyType)
+                {
+                    case ShaderPropertyType.Float:
+                    case ShaderPropertyType.Range:
+                        if (targetValue is float || targetValue is int || targetValue is double)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        if (float.TryParse(targetValue.ToString(), out _))
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        return new PropertyValidationResult(false, $"Value '{targetValue}' is not a valid float for property type {propertyType}");
+
+                    case ShaderPropertyType.Int:
+                        if (targetValue is int)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        if (int.TryParse(targetValue.ToString(), out _))
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        return new PropertyValidationResult(false, $"Value '{targetValue}' is not a valid integer for property type {propertyType}");
+
+                    case ShaderPropertyType.Color:
+                        if (targetValue is Color)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        if (targetValue is Vector4)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        return new PropertyValidationResult(false, $"Value '{targetValue}' is not a valid Color or Vector4 for property type {propertyType}");
+
+                    case ShaderPropertyType.Vector:
+                        if (targetValue is Vector4 || targetValue is Vector3 || targetValue is Vector2)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        return new PropertyValidationResult(false, $"Value '{targetValue}' is not a valid Vector for property type {propertyType}");
+
+                    case ShaderPropertyType.Texture:
+                        if (targetValue == null) // Null textures are valid (removes texture)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        if (targetValue is Texture || targetValue is Texture2D || targetValue is Texture3D || targetValue is Cubemap)
+                        {
+                            return new PropertyValidationResult(true, "", propertyType);
+                        }
+                        return new PropertyValidationResult(false, $"Value '{targetValue}' is not a valid Texture for property type {propertyType}");
+
+                    default:
+                        return new PropertyValidationResult(false, $"Unknown property type: {propertyType}");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                return new PropertyValidationResult(false, $"Error validating property value: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Validates both property existence and value compatibility
+        /// </summary>
+        /// <param name="shader">The shader to check</param>
+        /// <param name="propertyName">The property name to validate</param>
+        /// <param name="targetValue">The value to validate</param>
+        /// <returns>PropertyValidationResult indicating if both property and value are valid</returns>
+        public PropertyValidationResult ValidatePropertyAndValue(Shader shader, string propertyName, object targetValue)
+        {
+            // First validate the property exists
+            var propertyValidation = ValidateProperty(shader, propertyName);
+            if (!propertyValidation.IsValid)
+            {
+                return propertyValidation;
+            }
+
+            // Then validate the value is appropriate for the property type
+            var valueValidation = ValidatePropertyValue(propertyValidation.PropertyType, targetValue);
+            if (!valueValidation.IsValid)
+            {
+                return valueValidation;
+            }
+
+            return new PropertyValidationResult(true, "", propertyValidation.PropertyType);
+        }
     }
 }

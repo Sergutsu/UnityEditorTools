@@ -256,5 +256,335 @@ namespace MaterialPropertyModifier.Editor.Tests
                 Assert.IsTrue(kvp.Value.StartsWith("Assets/"), "Each path should start with Assets/");
             }
         }
+
+        #region Property Value Validation Tests
+
+        [Test]
+        public void ValidatePropertyValue_FloatType_ValidFloat_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Float, 1.5f);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate float value for Float property type");
+            Assert.AreEqual(ShaderPropertyType.Float, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_FloatType_ValidInt_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Float, 42);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate int value for Float property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_FloatType_ValidString_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Float, "3.14");
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate parseable string for Float property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_FloatType_InvalidString_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Float, "not_a_number");
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject non-parseable string for Float property type");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_IntType_ValidInt_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Int, 42);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate int value for Int property type");
+            Assert.AreEqual(ShaderPropertyType.Int, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_IntType_ValidString_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Int, "123");
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate parseable string for Int property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_IntType_InvalidString_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Int, "3.14");
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject float string for Int property type");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_ColorType_ValidColor_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Color, Color.red);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Color value for Color property type");
+            Assert.AreEqual(ShaderPropertyType.Color, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_ColorType_ValidVector4_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Color, new Vector4(1, 0, 0, 1));
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Vector4 value for Color property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_ColorType_InvalidType_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Color, "red");
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject string value for Color property type");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_VectorType_ValidVector4_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Vector, new Vector4(1, 2, 3, 4));
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Vector4 value for Vector property type");
+            Assert.AreEqual(ShaderPropertyType.Vector, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_VectorType_ValidVector3_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Vector, new Vector3(1, 2, 3));
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Vector3 value for Vector property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_VectorType_ValidVector2_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Vector, new Vector2(1, 2));
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Vector2 value for Vector property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_VectorType_InvalidType_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Vector, 42);
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject non-vector value for Vector property type");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_TextureType_ValidTexture2D_ReturnsTrue()
+        {
+            // Arrange
+            var texture = new Texture2D(1, 1);
+
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Texture, texture);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate Texture2D value for Texture property type");
+            Assert.AreEqual(ShaderPropertyType.Texture, result.PropertyType);
+
+            // Cleanup
+            Object.DestroyImmediate(texture);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_NullValue_ForTexture_ReturnsTrue()
+        {
+            // Act - Special case: null is valid for textures (removes texture)
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Texture, null);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate null texture (removes texture) for Texture property type");
+        }
+
+        [Test]
+        public void ValidatePropertyValue_TextureType_InvalidType_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Texture, "texture_name");
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject string value for Texture property type");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_RangeType_ValidFloat_ReturnsTrue()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Range, 0.5f);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate float value for Range property type");
+            Assert.AreEqual(ShaderPropertyType.Range, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidatePropertyValue_NullValue_ForNonTexture_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyValue(ShaderPropertyType.Float, null);
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject null value for non-texture property types");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        #endregion
+
+        #region Combined Property and Value Validation Tests
+
+        [Test]
+        public void ValidatePropertyAndValue_ValidPropertyAndValue_ReturnsTrue()
+        {
+            // Arrange
+            string validProperty = "_Metallic"; // Standard shader has this float property
+            float validValue = 0.5f;
+
+            // Act
+            var result = modifier.ValidatePropertyAndValue(testShader, validProperty, validValue);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate both existing property and compatible value");
+            Assert.IsEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyAndValue_InvalidProperty_ReturnsFalse()
+        {
+            // Arrange
+            string invalidProperty = "_NonExistentProperty";
+            float validValue = 0.5f;
+
+            // Act
+            var result = modifier.ValidatePropertyAndValue(testShader, invalidProperty, validValue);
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject non-existent property");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyAndValue_ValidPropertyInvalidValue_ReturnsFalse()
+        {
+            // Arrange
+            string validProperty = "_MainTex"; // Texture property
+            string invalidValue = "not_a_texture";
+
+            // Act
+            var result = modifier.ValidatePropertyAndValue(testShader, validProperty, invalidValue);
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject incompatible value type for valid property");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        [Test]
+        public void ValidatePropertyAndValue_NullShader_ReturnsFalse()
+        {
+            // Act
+            var result = modifier.ValidatePropertyAndValue(null, "_MainTex", new Texture2D(1, 1));
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject null shader");
+            Assert.IsNotEmpty(result.ErrorMessage);
+        }
+
+        #endregion
+
+        #region Various Shader Types Tests
+
+        [Test]
+        public void ValidateProperty_UnlitShader_ValidProperty_ReturnsTrue()
+        {
+            // Arrange
+            var unlitShader = Shader.Find("Unlit/Color");
+            string validProperty = "_Color"; // Unlit/Color shader has this property
+
+            // Act
+            var result = modifier.ValidateProperty(unlitShader, validProperty);
+
+            // Assert
+            Assert.IsTrue(result.IsValid, "Should validate existing property on Unlit shader");
+            Assert.AreEqual(ShaderPropertyType.Color, result.PropertyType);
+        }
+
+        [Test]
+        public void ValidateProperty_UnlitShader_InvalidProperty_ReturnsFalse()
+        {
+            // Arrange
+            var unlitShader = Shader.Find("Unlit/Color");
+            string invalidProperty = "_Metallic"; // Unlit shader doesn't have metallic
+
+            // Act
+            var result = modifier.ValidateProperty(unlitShader, invalidProperty);
+
+            // Assert
+            Assert.IsFalse(result.IsValid, "Should reject non-existent property on Unlit shader");
+        }
+
+        [Test]
+        public void ValidatePropertyAndValue_DifferentShaderTypes_WorksCorrectly()
+        {
+            // Test Standard shader
+            var standardResult = modifier.ValidatePropertyAndValue(testShader, "_Metallic", 0.5f);
+            Assert.IsTrue(standardResult.IsValid, "Should work with Standard shader");
+
+            // Test Unlit shader
+            var unlitShader = Shader.Find("Unlit/Color");
+            var unlitResult = modifier.ValidatePropertyAndValue(unlitShader, "_Color", Color.red);
+            Assert.IsTrue(unlitResult.IsValid, "Should work with Unlit shader");
+        }
+
+        [Test]
+        public void GetPropertyType_DifferentShaderTypes_ReturnsCorrectTypes()
+        {
+            // Test Standard shader properties
+            Assert.AreEqual(ShaderPropertyType.Texture, modifier.GetPropertyType(testShader, "_MainTex"));
+            Assert.AreEqual(ShaderPropertyType.Color, modifier.GetPropertyType(testShader, "_Color"));
+            
+            // Test Unlit shader properties
+            var unlitShader = Shader.Find("Unlit/Color");
+            Assert.AreEqual(ShaderPropertyType.Color, modifier.GetPropertyType(unlitShader, "_Color"));
+        }
+
+        #endregion
     }
 }
