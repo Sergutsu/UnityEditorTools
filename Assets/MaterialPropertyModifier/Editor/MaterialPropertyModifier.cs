@@ -63,7 +63,7 @@ namespace MaterialPropertyModifier.Editor
                         if (material != null && material.shader == targetShader)
                         {
                             foundMaterials.Add(material);
-                            LogWithContext(LogLevel.Debug, "MaterialDiscovery", "Found match", 
+                            LogWithContext(LogLevel.Info, "MaterialDiscovery", "Found match", 
                                 $"{material.name} at {assetPath}");
                         }
                     }
@@ -1172,7 +1172,7 @@ namespace MaterialPropertyModifier.Editor
                     try
                     {
                         Undo.RecordObjects(materialsToModify.ToArray(), $"Modify {propertyName} property");
-                        LogWithContext(LogLevel.Debug, "ApplyModifications", "Undo recorded", 
+                        LogWithContext(LogLevel.Info, "ApplyModifications", "Undo recorded", 
                             $"Materials: {materialsToModify.Count}");
                     }
                     catch (Exception ex)

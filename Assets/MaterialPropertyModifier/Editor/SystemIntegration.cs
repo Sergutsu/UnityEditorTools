@@ -24,11 +24,11 @@ namespace MaterialPropertyModifier.Editor
         {
             try
             {
-                LogWithThrottling($"Starting {operationName}", LogLevel.Debug);
+                LogWithThrottling($"Starting {operationName}", LogLevel.Info);
                 
                 var result = operation();
                 
-                LogWithThrottling($"Completed {operationName} successfully", LogLevel.Debug);
+                LogWithThrottling($"Completed {operationName} successfully", LogLevel.Info);
                 return OperationResult<T>.Success(result);
             }
             catch (ArgumentNullException ex)
@@ -192,7 +192,7 @@ namespace MaterialPropertyModifier.Editor
 
             switch (level)
             {
-                case LogLevel.Debug:
+                case LogLevel.Info:
                     Debug.Log($"[SystemIntegration] {message}");
                     break;
                 case LogLevel.Warning:
@@ -260,15 +260,7 @@ namespace MaterialPropertyModifier.Editor
         }
     }
 
-    /// <summary>
-    /// Log levels for system integration
-    /// </summary>
-    public enum LogLevel
-    {
-        Debug,
-        Warning,
-        Error
-    }
+
 
     /// <summary>
     /// Validation result for system state checks
