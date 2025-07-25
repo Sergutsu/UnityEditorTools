@@ -11,7 +11,7 @@ namespace MaterialPropertyModifier.Editor
     {
         public bool IsValid { get; set; }
         public string ErrorMessage { get; set; }
-        public ShaderPropertyType PropertyType { get; set; }
+        public UnityEditor.ShaderPropertyType PropertyType { get; set; }
 
         public PropertyValidationResult()
         {
@@ -19,7 +19,7 @@ namespace MaterialPropertyModifier.Editor
             ErrorMessage = string.Empty;
         }
 
-        public PropertyValidationResult(bool isValid, string errorMessage = "", ShaderPropertyType propertyType = ShaderPropertyType.Float)
+        public PropertyValidationResult(bool isValid, string errorMessage = "", UnityEditor.ShaderPropertyType propertyType = UnityEditor.ShaderPropertyType.Float)
         {
             IsValid = isValid;
             ErrorMessage = errorMessage ?? string.Empty;
