@@ -28,6 +28,25 @@ namespace MaterialPropertyModifier.Editor
         private string folderValidationMessage = "";
         private string shaderValidationMessage = "";
         
+        // Property configuration state
+        private string propertyName = "";
+        private object propertyValue;
+        private ShaderPropertyType propertyType = ShaderPropertyType.Float;
+        private bool isPropertyValid = false;
+        private string propertyValidationMessage = "";
+        
+        // Property value inputs
+        private float floatValue = 0f;
+        private int intValue = 0;
+        private Color colorValue = Color.white;
+        private Vector4 vectorValue = Vector4.zero;
+        private Texture textureValue;
+        
+        // Available properties for selected shader
+        private string[] availableProperties;
+        private ShaderPropertyType[] availablePropertyTypes;
+        private bool showPropertyHelper = false;
+        
         // UI Layout constants
         private const float WINDOW_MIN_WIDTH = 400f;
         private const float WINDOW_MIN_HEIGHT = 500f;
@@ -147,6 +166,10 @@ namespace MaterialPropertyModifier.Editor
         private void DrawMainContent()
         {
             DrawSelectionSection();
+            
+            GUILayout.Space(SECTION_SPACING);
+            
+            DrawPropertyConfigurationSection();
             
             GUILayout.Space(SECTION_SPACING);
             
@@ -280,6 +303,198 @@ namespace MaterialPropertyModifier.Editor
         }
 
         /// <summary>
+        /// Draw the property configuration section
+        /// </summary>
+        private void DrawPropertyConfigurationSection()
+        {
+            EditorGUILayout.BeginVertical("box");
+            
+            GUILayout.Label("Property Configuration", EditorStyles.boldLabel);
+            
+            // Only show if shader is selected
+            if (isShaderValid && selectedShader != null)
+            {
+                DrawPropertyNameInput();
+                
+                GUILayout.Space(5);
+                
+                DrawPropertyValueInput();
+                
+                GUILayout.Space(5);
+                
+                DrawPropertyHelper();
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("Select a shader to configure properties", MessageType.Info);
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// Draw property name input and validation
+        /// </summary>
+        private void DrawPropertyNameInput()
+        {
+            EditorGUILayout.BeginHorizontal();
+            
+            GUILayout.Label("Property Name:", GUILayout.Width(100));
+            
+            string newPropertyName = EditorGUILayout.TextField(propertyName);
+            
+            if (newPropertyName != propertyName)
+            {
+                propertyName = newPropertyName;
+                OnPropertyNameChanged();
+            }
+            
+            // Helper button
+            if (GUILayout.Button("?", GUILayout.Width(25), GUILayout.Height(EditorGUIUtility.singleLineHeight)))
+            {
+                showPropertyHelper = !showPropertyHelper;
+                if (showPropertyHelper)
+                {
+                    RefreshAvailableProperties();
+                }
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            
+            // Show validation message
+            if (!string.IsNullOrEmpty(propertyValidationMessage))
+            {
+                MessageType messageType = isPropertyValid ? MessageType.Info : MessageType.Warning;
+                EditorGUILayout.HelpBox(propertyValidationMessage, messageType);
+            }
+        }
+
+        /// <summary>
+        /// Draw property value input based on detected property type
+        /// </summary>
+        private void DrawPropertyValueInput()
+        {
+            if (!isPropertyValid)
+            {
+                EditorGUILayout.HelpBox("Enter a valid property name to configure value", MessageType.Info);
+                return;
+            }
+            
+            EditorGUILayout.BeginHorizontal();
+            
+            GUILayout.Label("Property Value:", GUILayout.Width(100));
+            
+            // Draw appropriate input based on property type
+            switch (propertyType)
+            {
+                case ShaderPropertyType.Float:
+                case ShaderPropertyType.Range:
+                    float newFloatValue = EditorGUILayout.FloatField(floatValue);
+                    if (newFloatValue != floatValue)
+                    {
+                        floatValue = newFloatValue;
+                        propertyValue = floatValue;
+                    }
+                    break;
+                
+                case ShaderPropertyType.Int:
+                    int newIntValue = EditorGUILayout.IntField(intValue);
+                    if (newIntValue != intValue)
+                    {
+                        intValue = newIntValue;
+                        propertyValue = intValue;
+                    }
+                    break;
+                
+                case ShaderPropertyType.Color:
+                    Color newColorValue = EditorGUILayout.ColorField(colorValue);
+                    if (newColorValue != colorValue)
+                    {
+                        colorValue = newColorValue;
+                        propertyValue = colorValue;
+                    }
+                    break;
+                
+                case ShaderPropertyType.Vector:
+                    Vector4 newVectorValue = EditorGUILayout.Vector4Field("", vectorValue);
+                    if (newVectorValue != vectorValue)
+                    {
+                        vectorValue = newVectorValue;
+                        propertyValue = vectorValue;
+                    }
+                    break;
+                
+                case ShaderPropertyType.Texture:
+                    Texture newTextureValue = (Texture)EditorGUILayout.ObjectField(
+                        textureValue, typeof(Texture), false);
+                    if (newTextureValue != textureValue)
+                    {
+                        textureValue = newTextureValue;
+                        propertyValue = textureValue;
+                    }
+                    break;
+            }
+            
+            EditorGUILayout.EndHorizontal();
+            
+            // Show property type info
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(105); // Align with label
+            GUILayout.Label($"Type: {propertyType}", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// Draw property helper showing available properties
+        /// </summary>
+        private void DrawPropertyHelper()
+        {
+            if (!showPropertyHelper)
+                return;
+            
+            EditorGUILayout.BeginVertical("box");
+            
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("Available Properties", EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Refresh", GUILayout.Width(60)))
+            {
+                RefreshAvailableProperties();
+            }
+            EditorGUILayout.EndHorizontal();
+            
+            if (availableProperties != null && availableProperties.Length > 0)
+            {
+                EditorGUILayout.BeginVertical("box");
+                
+                for (int i = 0; i < availableProperties.Length; i++)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    
+                    if (GUILayout.Button(availableProperties[i], EditorStyles.linkLabel))
+                    {
+                        propertyName = availableProperties[i];
+                        OnPropertyNameChanged();
+                        showPropertyHelper = false;
+                    }
+                    
+                    GUILayout.FlexibleSpace();
+                    GUILayout.Label(availablePropertyTypes[i].ToString(), EditorStyles.miniLabel, GUILayout.Width(80));
+                    
+                    EditorGUILayout.EndHorizontal();
+                }
+                
+                EditorGUILayout.EndVertical();
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("No properties found for selected shader", MessageType.Info);
+            }
+            
+            EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
         /// Draw status information section
         /// </summary>
         private void DrawStatusSection()
@@ -299,6 +514,12 @@ namespace MaterialPropertyModifier.Editor
             MessageType selectionType = (isFolderValid && isShaderValid) ? MessageType.Info : MessageType.Warning;
             
             EditorGUILayout.HelpBox(selectionStatus, selectionType);
+            
+            // Show property configuration status
+            string propertyStatus = GetPropertyStatusText();
+            MessageType propertyType = isPropertyValid ? MessageType.Info : MessageType.Warning;
+            
+            EditorGUILayout.HelpBox(propertyStatus, propertyType);
             
             // Show core component status
             string coreStatus = modifier != null ? "✓ Core logic ready" : "✗ Core logic not available";
@@ -517,6 +738,127 @@ namespace MaterialPropertyModifier.Editor
             else
             {
                 return "⚠ Folder and shader selection required";
+            }
+        }
+
+        /// <summary>
+        /// Get status text for property configuration validation
+        /// </summary>
+        private string GetPropertyStatusText()
+        {
+            if (!isShaderValid)
+            {
+                return "⚠ Select shader to configure properties";
+            }
+            else if (string.IsNullOrEmpty(propertyName))
+            {
+                return "⚠ Enter property name";
+            }
+            else if (isPropertyValid)
+            {
+                return $"✓ Property '{propertyName}' configured ({propertyType})";
+            }
+            else
+            {
+                return "⚠ Invalid property name";
+            }
+        }
+
+        /// <summary>
+        /// Handle property name changes and validation
+        /// </summary>
+        private void OnPropertyNameChanged()
+        {
+            if (selectedShader == null || string.IsNullOrEmpty(propertyName))
+            {
+                isPropertyValid = false;
+                propertyValidationMessage = "Enter a property name";
+                return;
+            }
+
+            try
+            {
+                var validation = modifier.ValidateProperty(selectedShader, propertyName);
+                isPropertyValid = validation.IsValid;
+                propertyValidationMessage = validation.IsValid ? 
+                    $"✓ Property '{propertyName}' found" : 
+                    validation.ErrorMessage;
+
+                if (validation.IsValid)
+                {
+                    propertyType = validation.PropertyType;
+                    InitializePropertyValue();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                isPropertyValid = false;
+                propertyValidationMessage = $"Error validating property: {ex.Message}";
+                Debug.LogError($"Property validation error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Initialize property value based on property type
+        /// </summary>
+        private void InitializePropertyValue()
+        {
+            switch (propertyType)
+            {
+                case ShaderPropertyType.Float:
+                case ShaderPropertyType.Range:
+                    propertyValue = floatValue;
+                    break;
+                
+                case ShaderPropertyType.Int:
+                    propertyValue = intValue;
+                    break;
+                
+                case ShaderPropertyType.Color:
+                    propertyValue = colorValue;
+                    break;
+                
+                case ShaderPropertyType.Vector:
+                    propertyValue = vectorValue;
+                    break;
+                
+                case ShaderPropertyType.Texture:
+                    propertyValue = textureValue;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Refresh the list of available properties for the selected shader
+        /// </summary>
+        private void RefreshAvailableProperties()
+        {
+            if (selectedShader == null)
+            {
+                availableProperties = new string[0];
+                availablePropertyTypes = new ShaderPropertyType[0];
+                return;
+            }
+
+            try
+            {
+                int propertyCount = selectedShader.GetPropertyCount();
+                availableProperties = new string[propertyCount];
+                availablePropertyTypes = new ShaderPropertyType[propertyCount];
+
+                for (int i = 0; i < propertyCount; i++)
+                {
+                    availableProperties[i] = selectedShader.GetPropertyName(i);
+                    availablePropertyTypes[i] = selectedShader.GetPropertyType(i);
+                }
+
+                Debug.Log($"Refreshed properties for shader '{selectedShader.name}': {propertyCount} properties found");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error refreshing shader properties: {ex.Message}");
+                availableProperties = new string[0];
+                availablePropertyTypes = new ShaderPropertyType[0];
             }
         }
     }
