@@ -3,6 +3,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEditor;
+using ShaderPropertyType = UnityEditor.ShaderPropertyType;
 
 namespace MaterialPropertyModifier.Editor.Tests
 {

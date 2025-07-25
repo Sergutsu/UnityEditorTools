@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using System;
+using ShaderPropertyType = UnityEditor.ShaderPropertyType;
 
 namespace MaterialPropertyModifier.Editor
 {

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using ShaderPropertyType = UnityEditor.ShaderPropertyType;
 
 namespace MaterialPropertyModifier.Editor
 {

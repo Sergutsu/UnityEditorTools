@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using ShaderPropertyType = UnityEditor.ShaderPropertyType;
 
 namespace MaterialPropertyModifier.Editor
 {
@@ -31,7 +32,7 @@ namespace MaterialPropertyModifier.Editor
         // Property configuration state
         private string propertyName = "";
         private object propertyValue;
-        private ShaderPropertyType propertyType = ShaderPropertyType.Float;
+        private UnityEditor.ShaderPropertyType propertyType = UnityEditor.ShaderPropertyType.Float;
         private bool isPropertyValid = false;
         private string propertyValidationMessage = "";
         
@@ -44,7 +45,7 @@ namespace MaterialPropertyModifier.Editor
         
         // Available properties for selected shader
         private string[] availableProperties;
-        private ShaderPropertyType[] availablePropertyTypes;
+        private UnityEditor.ShaderPropertyType[] availablePropertyTypes;
         private bool showPropertyHelper = false;
         
         // Material list and preview state

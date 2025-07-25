@@ -15,14 +15,14 @@ namespace MaterialPropertyModifier.Editor
         public object TargetValue { get; set; }
         public bool WillBeModified { get; set; }
         public string MaterialPath { get; set; }
-        public ShaderPropertyType PropertyType { get; set; }
+        public UnityEditor.ShaderPropertyType PropertyType { get; set; }
 
         public MaterialModification()
         {
             WillBeModified = false;
         }
 
-        public MaterialModification(Material material, object currentValue, object targetValue, bool willModify, string path, ShaderPropertyType propertyType)
+        public MaterialModification(Material material, object currentValue, object targetValue, bool willModify, string path, UnityEditor.ShaderPropertyType propertyType)
         {
             TargetMaterial = material;
             CurrentValue = currentValue;
