@@ -20,47 +20,76 @@ namespace MaterialPropertyModifier.Editor
         /// <returns>List of materials that use the target shader</returns>
         public List<Material> FindMaterialsWithShader(string folderPath, Shader targetShader)
         {
-            var foundMaterials = new List<Material>();
-            
-            if (string.IsNullOrEmpty(folderPath) || targetShader == null)
+            return OperationMonitor.MonitorOperation("FindMaterialsWithShader", () =>
             {
-                return foundMaterials;
-            }
+                return SystemIntegration.ExecuteWithErrorHandling(() =>
+                {
+                var foundMaterials = new List<Material>();
+                var failures = new List<string>();
+                
+                if (string.IsNullOrEmpty(folderPath) || targetShader == null)
+                {
+                    LogWithContext(LogLevel.Warning, "MaterialDiscovery", "Invalid parameters", 
+                        $"FolderPath: {folderPath ?? "null"}, Shader: {targetShader?.name ?? "null"}");
+                    return foundMaterials;
+                }
 
-            // Ensure the folder path starts with "Assets/"
-            if (!folderPath.StartsWith("Assets/"))
-            {
-                folderPath = "Assets/" + folderPath.TrimStart('/');
-            }
+                // Ensure the folder path starts with "Assets/"
+                if (!folderPath.StartsWith("Assets/"))
+                {
+                    folderPath = "Assets/" + folderPath.TrimStart('/');
+                }
 
-            try
-            {
+                // Validate folder exists
+                if (!AssetDatabase.IsValidFolder(folderPath))
+                {
+                    LogWithContext(LogLevel.Warning, "MaterialDiscovery", "Invalid folder", folderPath);
+                    return foundMaterials;
+                }
+
                 // Find all material assets in the specified folder and its subfolders recursively
                 string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { folderPath });
                 
-                Debug.Log($"Scanning folder '{folderPath}' for materials with shader '{targetShader.name}'...");
-                Debug.Log($"Found {materialGuids.Length} total materials in folder and subfolders");
+                LogWithContext(LogLevel.Info, "MaterialDiscovery", "Starting scan", 
+                    $"Folder: '{folderPath}', Shader: '{targetShader.name}', Total materials: {materialGuids.Length}");
                 
                 foreach (string guid in materialGuids)
                 {
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    Material material = AssetDatabase.LoadAssetAtPath<Material>(assetPath);
-                    
-                    if (material != null && material.shader == targetShader)
+                    try
                     {
-                        foundMaterials.Add(material);
-                        Debug.Log($"Found matching material: {material.name} at {assetPath}");
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                        Material material = AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+                        
+                        if (material != null && material.shader == targetShader)
+                        {
+                            foundMaterials.Add(material);
+                            LogWithContext(LogLevel.Debug, "MaterialDiscovery", "Found match", 
+                                $"{material.name} at {assetPath}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        string error = $"Failed to process material GUID {guid}: {ex.Message}";
+                        failures.Add(error);
+                        LogWithContext(LogLevel.Error, "MaterialDiscovery", "Material processing failed", error);
                     }
                 }
                 
-                Debug.Log($"Found {foundMaterials.Count} materials using shader '{targetShader.name}'");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"Error finding materials with shader in folder '{folderPath}': {ex.Message}");
-            }
-
-            return foundMaterials;
+                // Handle partial failures
+                if (failures.Count > 0)
+                {
+                    SystemIntegration.HandlePartialFailure("Material Discovery", failures, 
+                        foundMaterials.Select(m => m.name).ToList());
+                }
+                
+                LogWithContext(LogLevel.Info, "MaterialDiscovery", "Scan complete", 
+                    $"Found {foundMaterials.Count} materials using shader '{targetShader.name}'");
+                
+                return foundMaterials;
+                }, 
+                "Find Materials With Shader", 
+                new List<Material>()).Data;
+            }, $"Folder: {folderPath}, Shader: {targetShader?.name}");
         }
 
         /// <summary>
@@ -319,12 +348,19 @@ namespace MaterialPropertyModifier.Editor
         /// <returns>Validation result with detailed error information</returns>
         public PropertyValidationResult ValidateSystemPrerequisites()
         {
-            try
+            return SystemIntegration.ExecuteWithErrorHandling(() =>
             {
                 // Check Unity Editor state
                 if (!Application.isEditor)
                 {
                     return new PropertyValidationResult(false, "Material Property Modifier can only run in Unity Editor");
+                }
+
+                // Use comprehensive system state validation
+                var systemState = SystemIntegration.ValidateSystemState();
+                if (!systemState.IsValid)
+                {
+                    return new PropertyValidationResult(false, $"System state validation failed: {systemState.Message}");
                 }
 
                 // Check AssetDatabase availability
@@ -341,11 +377,9 @@ namespace MaterialPropertyModifier.Editor
                 }
 
                 return new PropertyValidationResult(true, "System prerequisites validated successfully");
-            }
-            catch (Exception ex)
-            {
-                return new PropertyValidationResult(false, $"System validation failed: {ex.Message}");
-            }
+            }, 
+            "System Prerequisites Validation", 
+            new PropertyValidationResult(false, "System validation failed due to unexpected error")).Data;
         }
 
         /// <summary>
@@ -1105,90 +1139,118 @@ namespace MaterialPropertyModifier.Editor
         /// <returns>ModificationResult containing the results of the operation</returns>
         public ModificationResult ApplyModifications(ModificationPreview preview, string propertyName, object targetValue)
         {
-            var result = new ModificationResult();
-            
-            if (preview == null || preview.Modifications == null)
+            return SystemIntegration.ExecuteWithErrorHandling(() =>
             {
-                result.ErrorMessages.Add("Invalid preview data provided");
-                return result;
-            }
-
-            result.TotalProcessed = preview.Modifications.Count;
-            result.SkippedMaterials = preview.SkippedCount;
-
-            // Record undo for all materials that will be modified
-            var materialsToModify = new List<Material>();
-            foreach (var modification in preview.Modifications)
-            {
-                if (modification.WillBeModified && modification.TargetMaterial != null)
+                var result = new ModificationResult();
+                var failures = new List<string>();
+                var successes = new List<string>();
+                
+                if (preview == null || preview.Modifications == null)
                 {
-                    materialsToModify.Add(modification.TargetMaterial);
+                    result.ErrorMessages.Add("Invalid preview data provided");
+                    return result;
                 }
-            }
 
-            if (materialsToModify.Count > 0)
-            {
-                Undo.RecordObjects(materialsToModify.ToArray(), $"Modify {propertyName} property");
-            }
+                result.TotalProcessed = preview.Modifications.Count;
+                result.SkippedMaterials = preview.SkippedCount;
 
-            // Apply modifications
-            foreach (var modification in preview.Modifications)
-            {
-                try
+                LogWithContext(LogLevel.Info, "ApplyModifications", "Starting modifications", 
+                    $"Property: {propertyName}, Total: {result.TotalProcessed}");
+
+                // Record undo for all materials that will be modified
+                var materialsToModify = new List<Material>();
+                foreach (var modification in preview.Modifications)
                 {
-                    if (!modification.WillBeModified)
+                    if (modification.WillBeModified && modification.TargetMaterial != null)
                     {
-                        result.SuccessMessages.Add($"Skipped {modification.TargetMaterial.name} (value unchanged)");
-                        continue;
+                        materialsToModify.Add(modification.TargetMaterial);
                     }
+                }
 
-                    if (modification.TargetMaterial == null)
+                if (materialsToModify.Count > 0)
+                {
+                    try
+                    {
+                        Undo.RecordObjects(materialsToModify.ToArray(), $"Modify {propertyName} property");
+                        LogWithContext(LogLevel.Debug, "ApplyModifications", "Undo recorded", 
+                            $"Materials: {materialsToModify.Count}");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogWithContext(LogLevel.Warning, "ApplyModifications", "Undo recording failed", ex.Message);
+                    }
+                }
+
+                // Apply modifications
+                foreach (var modification in preview.Modifications)
+                {
+                    try
+                    {
+                        if (!modification.WillBeModified)
+                        {
+                            result.SuccessMessages.Add($"Skipped {modification.TargetMaterial.name} (value unchanged)");
+                            continue;
+                        }
+
+                        if (modification.TargetMaterial == null)
+                        {
+                            result.FailedModifications++;
+                            string error = "Null material reference";
+                            result.ErrorMessages.Add(error);
+                            failures.Add(error);
+                            continue;
+                        }
+
+                        bool success = SetMaterialProperty(modification.TargetMaterial, propertyName, targetValue, modification.PropertyType);
+                        
+                        if (success)
+                        {
+                            // Mark material as dirty for saving
+                            EditorUtility.SetDirty(modification.TargetMaterial);
+                            result.SuccessfulModifications++;
+                            string successMsg = $"Modified {modification.TargetMaterial.name}: {modification.CurrentValue} → {modification.TargetValue}";
+                            result.SuccessMessages.Add(successMsg);
+                            successes.Add(modification.TargetMaterial.name);
+                        }
+                        else
+                        {
+                            result.FailedModifications++;
+                            string error = $"Failed to set property on {modification.TargetMaterial.name}";
+                            result.ErrorMessages.Add(error);
+                            failures.Add(error);
+                        }
+                    }
+                    catch (Exception ex)
                     {
                         result.FailedModifications++;
-                        result.ErrorMessages.Add("Null material reference");
-                        continue;
-                    }
-
-                    bool success = SetMaterialProperty(modification.TargetMaterial, propertyName, targetValue, modification.PropertyType);
-                    
-                    if (success)
-                    {
-                        // Mark material as dirty for saving
-                        EditorUtility.SetDirty(modification.TargetMaterial);
-                        result.SuccessfulModifications++;
-                        result.SuccessMessages.Add($"Modified {modification.TargetMaterial.name}: {modification.CurrentValue} → {modification.TargetValue}");
-                    }
-                    else
-                    {
-                        result.FailedModifications++;
-                        result.ErrorMessages.Add($"Failed to set property on {modification.TargetMaterial.name}");
+                        string materialName = modification.TargetMaterial?.name ?? "Unknown";
+                        string error = $"Error modifying {materialName}: {ex.Message}";
+                        result.ErrorMessages.Add(error);
+                        failures.Add(error);
+                        LogWithContext(LogLevel.Error, "ApplyModifications", "Material modification failed", error);
                     }
                 }
-                catch (System.Exception ex)
-                {
-                    result.FailedModifications++;
-                    string materialName = modification.TargetMaterial?.name ?? "Unknown";
-                    result.ErrorMessages.Add($"Error modifying {materialName}: {ex.Message}");
-                    Debug.LogError($"Error applying modification to {materialName}: {ex.Message}");
-                }
-            }
 
-            // Save assets if any modifications were successful
-            if (result.SuccessfulModifications > 0)
-            {
-                try
+                // Handle partial failures
+                if (failures.Count > 0)
                 {
-                    AssetDatabase.SaveAssets();
+                    SystemIntegration.HandlePartialFailure("Material Modifications", failures, successes);
+                }
+
+                // Save assets if any modifications were successful
+                if (result.SuccessfulModifications > 0)
+                {
+                    SystemIntegration.EnsureAssetConsistency();
                     result.SuccessMessages.Add($"Saved {result.SuccessfulModifications} modified materials");
                 }
-                catch (System.Exception ex)
-                {
-                    result.ErrorMessages.Add($"Error saving assets: {ex.Message}");
-                    Debug.LogError($"Error saving assets: {ex.Message}");
-                }
-            }
 
-            return result;
+                LogWithContext(LogLevel.Info, "ApplyModifications", "Modifications complete", 
+                    $"Successful: {result.SuccessfulModifications}, Failed: {result.FailedModifications}");
+
+                return result;
+            }, 
+            "Apply Material Modifications", 
+            new ModificationResult { ErrorMessages = { "Failed to apply modifications due to unexpected error" } }).Data;
         }
 
         /// <summary>
