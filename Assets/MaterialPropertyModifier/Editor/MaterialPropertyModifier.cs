@@ -271,5 +271,179 @@ namespace MaterialPropertyModifier.Editor
 
             return new PropertyValidationResult(true, "", propertyValidation.PropertyType);
         }
+
+        /// <summary>
+        /// Generates a preview of modifications that would be applied to the given materials
+        /// </summary>
+        /// <param name="materials">List of materials to preview modifications for</param>
+        /// <param name="propertyName">The property name to modify</param>
+        /// <param name="targetValue">The target value to set</param>
+        /// <returns>ModificationPreview containing details of what would be modified</returns>
+        public ModificationPreview PreviewModifications(List<Material> materials, string propertyName, object targetValue)
+        {
+            var preview = new ModificationPreview();
+            
+            if (materials == null || materials.Count == 0)
+            {
+                return preview;
+            }
+
+            preview.TotalCount = materials.Count;
+
+            foreach (var material in materials)
+            {
+                if (material == null)
+                {
+                    preview.SkippedMaterials.Add("Null material reference");
+                    continue;
+                }
+
+                try
+                {
+                    string materialPath = GetMaterialAssetPath(material);
+                    
+                    // Validate property exists on this material's shader
+                    var propertyValidation = ValidateProperty(material.shader, propertyName);
+                    if (!propertyValidation.IsValid)
+                    {
+                        preview.SkippedMaterials.Add($"{material.name} ({materialPath}): {propertyValidation.ErrorMessage}");
+                        continue;
+                    }
+
+                    // Get current value
+                    object currentValue = GetMaterialPropertyValue(material, propertyName, propertyValidation.PropertyType);
+                    
+                    // Check if values are different (only modify if different)
+                    bool willModify = !AreValuesEqual(currentValue, targetValue, propertyValidation.PropertyType);
+                    
+                    var modification = new MaterialModification(
+                        material, 
+                        currentValue, 
+                        targetValue, 
+                        willModify, 
+                        materialPath, 
+                        propertyValidation.PropertyType
+                    );
+                    
+                    preview.Modifications.Add(modification);
+                }
+                catch (System.Exception ex)
+                {
+                    string materialPath = GetMaterialAssetPath(material);
+                    preview.SkippedMaterials.Add($"{material.name} ({materialPath}): Error - {ex.Message}");
+                }
+            }
+
+            return preview;
+        }
+
+        /// <summary>
+        /// Gets the current value of a property from a material
+        /// </summary>
+        /// <param name="material">The material to get the value from</param>
+        /// <param name="propertyName">The property name</param>
+        /// <param name="propertyType">The property type</param>
+        /// <returns>The current property value</returns>
+        private object GetMaterialPropertyValue(Material material, string propertyName, ShaderPropertyType propertyType)
+        {
+            if (material == null || !material.HasProperty(propertyName))
+            {
+                return null;
+            }
+
+            try
+            {
+                switch (propertyType)
+                {
+                    case ShaderPropertyType.Float:
+                    case ShaderPropertyType.Range:
+                        return material.GetFloat(propertyName);
+                    
+                    case ShaderPropertyType.Int:
+                        return material.GetInt(propertyName);
+                    
+                    case ShaderPropertyType.Color:
+                        return material.GetColor(propertyName);
+                    
+                    case ShaderPropertyType.Vector:
+                        return material.GetVector(propertyName);
+                    
+                    case ShaderPropertyType.Texture:
+                        return material.GetTexture(propertyName);
+                    
+                    default:
+                        return null;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error getting property value for '{propertyName}' on material '{material.name}': {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Compares two values to determine if they are equal for the given property type
+        /// </summary>
+        /// <param name="currentValue">The current value</param>
+        /// <param name="targetValue">The target value</param>
+        /// <param name="propertyType">The property type</param>
+        /// <returns>True if values are considered equal</returns>
+        private bool AreValuesEqual(object currentValue, object targetValue, ShaderPropertyType propertyType)
+        {
+            if (currentValue == null && targetValue == null)
+                return true;
+            
+            if (currentValue == null || targetValue == null)
+                return false;
+
+            try
+            {
+                switch (propertyType)
+                {
+                    case ShaderPropertyType.Float:
+                    case ShaderPropertyType.Range:
+                        float currentFloat = System.Convert.ToSingle(currentValue);
+                        float targetFloat = System.Convert.ToSingle(targetValue);
+                        return Mathf.Approximately(currentFloat, targetFloat);
+                    
+                    case ShaderPropertyType.Int:
+                        int currentInt = System.Convert.ToInt32(currentValue);
+                        int targetInt = System.Convert.ToInt32(targetValue);
+                        return currentInt == targetInt;
+                    
+                    case ShaderPropertyType.Color:
+                        Color currentColor = (Color)currentValue;
+                        Color targetColor;
+                        if (targetValue is Vector4 vec4)
+                            targetColor = new Color(vec4.x, vec4.y, vec4.z, vec4.w);
+                        else
+                            targetColor = (Color)targetValue;
+                        return currentColor == targetColor;
+                    
+                    case ShaderPropertyType.Vector:
+                        Vector4 currentVector = (Vector4)currentValue;
+                        Vector4 targetVector;
+                        if (targetValue is Vector3 vec3)
+                            targetVector = new Vector4(vec3.x, vec3.y, vec3.z, 0);
+                        else if (targetValue is Vector2 vec2)
+                            targetVector = new Vector4(vec2.x, vec2.y, 0, 0);
+                        else
+                            targetVector = (Vector4)targetValue;
+                        return currentVector == targetVector;
+                    
+                    case ShaderPropertyType.Texture:
+                        return currentValue == targetValue; // Reference equality for textures
+                    
+                    default:
+                        return currentValue.Equals(targetValue);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error comparing values: {ex.Message}");
+                return false;
+            }
+        }
     }
 }

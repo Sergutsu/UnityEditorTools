@@ -586,5 +586,96 @@ namespace MaterialPropertyModifier.Editor.Tests
         }
 
         #endregion
+
+        #region Modification Preview Tests
+
+        [Test]
+        public void PreviewModifications_ValidMaterialsAndProperty_ReturnsCorrectPreview()
+        {
+            // Arrange
+            var materialsWithTargetShader = testMaterials.Where(m => m.shader == testShader).ToList();
+            string propertyName = "_Metallic";
+            float targetValue = 0.8f;
+
+            // Act
+            var preview = modifier.PreviewModifications(materialsWithTargetShader, propertyName, targetValue);
+
+            // Assert
+            Assert.IsNotNull(preview, "Preview should not be null");
+            Assert.AreEqual(materialsWithTargetShader.Count, preview.TotalCount, "Total count should match input materials");
+            Assert.IsTrue(preview.ModifiedCount > 0, "Should have materials to modify");
+        }
+
+        [Test]
+        public void PreviewModifications_EmptyMaterialList_ReturnsEmptyPreview()
+        {
+            // Arrange
+            var emptyList = new List<Material>();
+
+            // Act
+            var preview = modifier.PreviewModifications(emptyList, "_Metallic", 0.5f);
+
+            // Assert
+            Assert.IsNotNull(preview, "Preview should not be null");
+            Assert.AreEqual(0, preview.TotalCount, "Total count should be 0");
+            Assert.AreEqual(0, preview.ModifiedCount, "Modified count should be 0");
+            Assert.AreEqual(0, preview.SkippedCount, "Skipped count should be 0");
+        }
+
+        [Test]
+        public void PreviewModifications_InvalidProperty_SkipsMaterials()
+        {
+            // Arrange
+            var materialsWithTargetShader = testMaterials.Where(m => m.shader == testShader).ToList();
+            string invalidProperty = "_NonExistentProperty";
+
+            // Act
+            var preview = modifier.PreviewModifications(materialsWithTargetShader, invalidProperty, 0.5f);
+
+            // Assert
+            Assert.IsNotNull(preview, "Preview should not be null");
+            Assert.AreEqual(materialsWithTargetShader.Count, preview.TotalCount, "Total count should match input");
+            Assert.AreEqual(0, preview.ModifiedCount, "Should have no modifications for invalid property");
+            Assert.AreEqual(materialsWithTargetShader.Count, preview.SkippedCount, "All materials should be skipped");
+        }
+
+        [Test]
+        public void PreviewModifications_NullMaterial_HandlesGracefully()
+        {
+            // Arrange
+            var materialsWithNull = new List<Material> { testMaterials[0], null, testMaterials[1] };
+
+            // Act
+            var preview = modifier.PreviewModifications(materialsWithNull, "_Metallic", 0.5f);
+
+            // Assert
+            Assert.IsNotNull(preview, "Preview should not be null");
+            Assert.AreEqual(3, preview.TotalCount, "Total count should include null material");
+            Assert.IsTrue(preview.SkippedCount > 0, "Should skip null material");
+        }
+
+        [Test]
+        public void PreviewModifications_SameValues_DoesNotModify()
+        {
+            // Arrange
+            var material = testMaterials.First(m => m.shader == testShader);
+            var materialList = new List<Material> { material };
+            
+            // Set a known value first
+            material.SetFloat("_Metallic", 0.5f);
+            
+            // Act - Try to set the same value
+            var preview = modifier.PreviewModifications(materialList, "_Metallic", 0.5f);
+
+            // Assert
+            Assert.IsNotNull(preview, "Preview should not be null");
+            Assert.AreEqual(1, preview.TotalCount, "Should have one material");
+            
+            // Should have one modification entry but WillBeModified should be false
+            Assert.AreEqual(1, preview.ModifiedCount, "Should have one modification entry");
+            Assert.IsFalse(preview.Modifications[0].WillBeModified, "Should not modify when values are the same");
+        }
+
+        #endregion
     }
 }
