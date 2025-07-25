@@ -32,7 +32,7 @@ namespace MaterialPropertyModifier.Editor
         // Property configuration state
         private string propertyName = "";
         private object propertyValue;
-        private UnityEditor.ShaderPropertyType propertyType = UnityEditor.ShaderPropertyType.Float;
+        private ShaderPropertyType propertyType = ShaderPropertyType.Float;
         private bool isPropertyValid = false;
         private string propertyValidationMessage = "";
         
@@ -45,7 +45,7 @@ namespace MaterialPropertyModifier.Editor
         
         // Available properties for selected shader
         private string[] availableProperties;
-        private UnityEditor.ShaderPropertyType[] availablePropertyTypes;
+        private ShaderPropertyType[] availablePropertyTypes;
         private bool showPropertyHelper = false;
         
         // Material list and preview state
