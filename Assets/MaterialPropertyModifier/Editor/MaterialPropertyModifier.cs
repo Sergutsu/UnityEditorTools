@@ -445,5 +445,181 @@ namespace MaterialPropertyModifier.Editor
                 return false;
             }
         }
+
+        /// <summary>
+        /// Applies modifications to materials based on the provided preview
+        /// </summary>
+        /// <param name="preview">The modification preview containing materials to modify</param>
+        /// <param name="propertyName">The property name to modify</param>
+        /// <param name="targetValue">The target value to set</param>
+        /// <returns>ModificationResult containing the results of the operation</returns>
+        public ModificationResult ApplyModifications(ModificationPreview preview, string propertyName, object targetValue)
+        {
+            var result = new ModificationResult();
+            
+            if (preview == null || preview.Modifications == null)
+            {
+                result.ErrorMessages.Add("Invalid preview data provided");
+                return result;
+            }
+
+            result.TotalProcessed = preview.Modifications.Count;
+            result.SkippedMaterials = preview.SkippedCount;
+
+            // Record undo for all materials that will be modified
+            var materialsToModify = new List<Material>();
+            foreach (var modification in preview.Modifications)
+            {
+                if (modification.WillBeModified && modification.TargetMaterial != null)
+                {
+                    materialsToModify.Add(modification.TargetMaterial);
+                }
+            }
+
+            if (materialsToModify.Count > 0)
+            {
+                Undo.RecordObjects(materialsToModify.ToArray(), $"Modify {propertyName} property");
+            }
+
+            // Apply modifications
+            foreach (var modification in preview.Modifications)
+            {
+                try
+                {
+                    if (!modification.WillBeModified)
+                    {
+                        result.SuccessMessages.Add($"Skipped {modification.TargetMaterial.name} (value unchanged)");
+                        continue;
+                    }
+
+                    if (modification.TargetMaterial == null)
+                    {
+                        result.FailedModifications++;
+                        result.ErrorMessages.Add("Null material reference");
+                        continue;
+                    }
+
+                    bool success = SetMaterialProperty(modification.TargetMaterial, propertyName, targetValue, modification.PropertyType);
+                    
+                    if (success)
+                    {
+                        // Mark material as dirty for saving
+                        EditorUtility.SetDirty(modification.TargetMaterial);
+                        result.SuccessfulModifications++;
+                        result.SuccessMessages.Add($"Modified {modification.TargetMaterial.name}: {modification.CurrentValue} → {modification.TargetValue}");
+                    }
+                    else
+                    {
+                        result.FailedModifications++;
+                        result.ErrorMessages.Add($"Failed to set property on {modification.TargetMaterial.name}");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    result.FailedModifications++;
+                    string materialName = modification.TargetMaterial?.name ?? "Unknown";
+                    result.ErrorMessages.Add($"Error modifying {materialName}: {ex.Message}");
+                    Debug.LogError($"Error applying modification to {materialName}: {ex.Message}");
+                }
+            }
+
+            // Save assets if any modifications were successful
+            if (result.SuccessfulModifications > 0)
+            {
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                    result.SuccessMessages.Add($"Saved {result.SuccessfulModifications} modified materials");
+                }
+                catch (System.Exception ex)
+                {
+                    result.ErrorMessages.Add($"Error saving assets: {ex.Message}");
+                    Debug.LogError($"Error saving assets: {ex.Message}");
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Applies modifications to a list of materials (alternative method without preview)
+        /// </summary>
+        /// <param name="materials">List of materials to modify</param>
+        /// <param name="propertyName">The property name to modify</param>
+        /// <param name="targetValue">The target value to set</param>
+        /// <returns>ModificationResult containing the results of the operation</returns>
+        public ModificationResult ApplyModifications(List<Material> materials, string propertyName, object targetValue)
+        {
+            // Generate preview first, then apply
+            var preview = PreviewModifications(materials, propertyName, targetValue);
+            return ApplyModifications(preview, propertyName, targetValue);
+        }
+
+        /// <summary>
+        /// Sets a property value on a material using the appropriate method based on property type
+        /// </summary>
+        /// <param name="material">The material to modify</param>
+        /// <param name="propertyName">The property name</param>
+        /// <param name="value">The value to set</param>
+        /// <param name="propertyType">The property type</param>
+        /// <returns>True if the property was set successfully</returns>
+        private bool SetMaterialProperty(Material material, string propertyName, object value, ShaderPropertyType propertyType)
+        {
+            if (material == null || !material.HasProperty(propertyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                switch (propertyType)
+                {
+                    case ShaderPropertyType.Float:
+                    case ShaderPropertyType.Range:
+                        float floatValue = System.Convert.ToSingle(value);
+                        material.SetFloat(propertyName, floatValue);
+                        return true;
+                    
+                    case ShaderPropertyType.Int:
+                        int intValue = System.Convert.ToInt32(value);
+                        material.SetInt(propertyName, intValue);
+                        return true;
+                    
+                    case ShaderPropertyType.Color:
+                        Color colorValue;
+                        if (value is Vector4 vec4)
+                            colorValue = new Color(vec4.x, vec4.y, vec4.z, vec4.w);
+                        else
+                            colorValue = (Color)value;
+                        material.SetColor(propertyName, colorValue);
+                        return true;
+                    
+                    case ShaderPropertyType.Vector:
+                        Vector4 vectorValue;
+                        if (value is Vector3 vec3)
+                            vectorValue = new Vector4(vec3.x, vec3.y, vec3.z, 0);
+                        else if (value is Vector2 vec2)
+                            vectorValue = new Vector4(vec2.x, vec2.y, 0, 0);
+                        else
+                            vectorValue = (Vector4)value;
+                        material.SetVector(propertyName, vectorValue);
+                        return true;
+                    
+                    case ShaderPropertyType.Texture:
+                        Texture textureValue = value as Texture;
+                        material.SetTexture(propertyName, textureValue); // null is valid (removes texture)
+                        return true;
+                    
+                    default:
+                        Debug.LogWarning($"Unsupported property type: {propertyType}");
+                        return false;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error setting property '{propertyName}' on material '{material.name}': {ex.Message}");
+                return false;
+            }
+        }
     }
 }

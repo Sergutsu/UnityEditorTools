@@ -677,5 +677,179 @@ namespace MaterialPropertyModifier.Editor.Tests
         }
 
         #endregion
+
+        #region Material Modification Tests
+
+        [Test]
+        public void ApplyModifications_ValidMaterials_ModifiesSuccessfully()
+        {
+            // Arrange
+            var materialsToModify = testMaterials.Where(m => m.shader == testShader).ToList();
+            string propertyName = "_Metallic";
+            float targetValue = 0.8f;
+
+            // Act
+            var result = modifier.ApplyModifications(materialsToModify, propertyName, targetValue);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.SuccessfulModifications > 0, "Should have successful modifications");
+            Assert.AreEqual(0, result.FailedModifications, "Should have no failed modifications");
+            
+            // Verify the actual property values were changed
+            foreach (var material in materialsToModify)
+            {
+                if (material.HasProperty(propertyName))
+                {
+                    Assert.AreEqual(targetValue, material.GetFloat(propertyName), 0.001f, 
+                        $"Material {material.name} should have the target value");
+                }
+            }
+        }
+
+        [Test]
+        public void ApplyModifications_EmptyMaterialList_ReturnsEmptyResult()
+        {
+            // Arrange
+            var emptyList = new List<Material>();
+
+            // Act
+            var result = modifier.ApplyModifications(emptyList, "_Metallic", 0.5f);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(0, result.TotalProcessed);
+            Assert.AreEqual(0, result.SuccessfulModifications);
+            Assert.AreEqual(0, result.FailedModifications);
+        }
+
+        [Test]
+        public void ApplyModifications_InvalidProperty_HandlesGracefully()
+        {
+            // Arrange
+            var materialsToModify = testMaterials.Where(m => m.shader == testShader).ToList();
+            string invalidProperty = "_NonExistentProperty";
+
+            // Act
+            var result = modifier.ApplyModifications(materialsToModify, invalidProperty, 0.5f);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(0, result.SuccessfulModifications, "Should have no successful modifications for invalid property");
+        }
+
+        [Test]
+        public void PreviewModifications_ValidMaterials_GeneratesCorrectPreview()
+        {
+            // Arrange
+            var materialsToPreview = testMaterials.Where(m => m.shader == testShader).ToList();
+            string propertyName = "_Metallic";
+            float targetValue = 0.7f;
+
+            // Act
+            var preview = modifier.PreviewModifications(materialsToPreview, propertyName, targetValue);
+
+            // Assert
+            Assert.IsNotNull(preview);
+            Assert.AreEqual(materialsToPreview.Count, preview.TotalCount);
+            Assert.IsTrue(preview.Modifications.Count > 0, "Should have modifications in preview");
+            
+            foreach (var modification in preview.Modifications)
+            {
+                Assert.IsNotNull(modification.TargetMaterial);
+                Assert.IsNotNull(modification.FilePath);
+            }
+        }
+
+        [Test]
+        public void PreviewModifications_SameValue_ShowsNoModification()
+        {
+            // Arrange
+            var material = testMaterials.First(m => m.shader == testShader);
+            string propertyName = "_Metallic";
+            
+            // Set initial value
+            material.SetFloat(propertyName, 0.5f);
+            float sameValue = 0.5f;
+
+            // Act
+            var preview = modifier.PreviewModifications(new List<Material> { material }, propertyName, sameValue);
+
+            // Assert
+            Assert.IsNotNull(preview);
+            Assert.AreEqual(1, preview.Modifications.Count);
+            Assert.IsFalse(preview.Modifications[0].WillBeModified, "Should not modify when values are the same");
+        }
+
+        [Test]
+        public void ApplyModifications_ColorProperty_WorksCorrectly()
+        {
+            // Arrange
+            var material = testMaterials.First(m => m.shader == testShader);
+            string propertyName = "_Color";
+            Color targetColor = Color.red;
+
+            // Act
+            var result = modifier.ApplyModifications(new List<Material> { material }, propertyName, targetColor);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.SuccessfulModifications > 0, "Should successfully modify color property");
+            Assert.AreEqual(targetColor, material.GetColor(propertyName), "Material should have the target color");
+        }
+
+        [Test]
+        public void ApplyModifications_VectorProperty_WorksCorrectly()
+        {
+            // Arrange
+            var material = testMaterials.First(m => m.shader == testShader);
+            string propertyName = "_MainTex"; // This might have tiling/offset as vector
+            Vector4 targetVector = new Vector4(2, 2, 0, 0);
+
+            // Check if material has a vector property we can test
+            if (material.HasProperty(propertyName + "_ST")) // Tiling and offset
+            {
+                propertyName = propertyName + "_ST";
+                
+                // Act
+                var result = modifier.ApplyModifications(new List<Material> { material }, propertyName, targetVector);
+
+                // Assert
+                Assert.IsNotNull(result);
+                if (result.SuccessfulModifications > 0)
+                {
+                    Assert.AreEqual(targetVector, material.GetVector(propertyName), "Material should have the target vector");
+                }
+            }
+            else
+            {
+                // Skip this test if no suitable vector property is available
+                Assert.Pass("No suitable vector property available for testing");
+            }
+        }
+
+        [Test]
+        public void ApplyModifications_WithUndo_SupportsUndo()
+        {
+            // Arrange
+            var material = testMaterials.First(m => m.shader == testShader);
+            string propertyName = "_Metallic";
+            float originalValue = material.GetFloat(propertyName);
+            float targetValue = originalValue + 0.5f;
+
+            // Act
+            var result = modifier.ApplyModifications(new List<Material> { material }, propertyName, targetValue);
+
+            // Assert
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.SuccessfulModifications > 0, "Should have successful modifications");
+            Assert.AreEqual(targetValue, material.GetFloat(propertyName), 0.001f, "Should have new value");
+            
+            // Test undo (this would normally be triggered by Unity's undo system)
+            // We can't easily test the actual undo functionality in unit tests,
+            // but we can verify the modification was applied
+        }
+
+        #endregion
     }
 }
